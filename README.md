@@ -152,7 +152,7 @@ Stato treats agent expertise like code: captured in structured modules, validate
 | `stato registry search` | Search packages by keyword |
 | `stato registry install` | Install a community package |
 
-Full documentation: [stato.hiniki.com/docs](https://stato.hiniki.com/getting-started/installation/)
+Full documentation: [stato.hiniki.com](https://stato.hiniki.com/getting-started/installation/) | [USAGE.md](USAGE.md)
 
 ## Comparison
 
@@ -183,11 +183,9 @@ Issues and PRs welcome.
 
 ## Contact
 
-Min Dai — dai@broadinstitute.org
+Min Dai - dai@broadinstitute.org
 
-## Acknowledgments
-
-Built at the [Fishell Lab](https://fishelllab.hms.harvard.edu/), Harvard Medical School and the Broad Institute of MIT and Harvard.
+[Fishell Laboratory](https://fishelllab.hms.harvard.edu/), Harvard Medical School and the Broad Institute of MIT and Harvard.
 
 ## License
 
