@@ -1,0 +1,41 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+venv/
+.env
+*.egg
+
+# Node (website is not published to GitHub)
+node_modules/
+package-lock.json
+
+# Website (published separately to stato.hiniki.com)
+stato-website/
+
+# Claude Code (users generate their own)
+.claude/
+CLAUDE.md
+
+# Development files (keep in dev only)
+docs/prompt/
+
+# Test cache
+.pytest_cache/
+
+# Stato runtime (users generate their own)
+.stato/prompts/

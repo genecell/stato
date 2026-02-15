@@ -1,0 +1,69 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "stato"
+version = "0.5.0"
+description = "Capture, validate, and transfer AI agent expertise."
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Min Dai", email = "dai@broadinstitute.org"},
+]
+keywords = ["ai", "agent", "expertise", "claude", "cursor", "codex", "llm", "knowledge-transfer", "cli"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "click>=8.0",
+    "rich>=13.0",
+    "tomli>=2.0",
+    "tomli-w>=1.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+test-agent = [
+    "pytest>=8.0",
+    "claude-agent-sdk>=0.1.0",
+    "anyio>=4.0",
+]
+
+[project.urls]
+Homepage = "https://stato.hiniki.com"
+Repository = "https://github.com/genecell/stato"
+Documentation = "https://stato.hiniki.com/getting-started/installation/"
+"Bug Tracker" = "https://github.com/genecell/stato/issues"
+
+[project.scripts]
+stato = "stato.cli:main"
+
+[tool.pytest.ini_options]
+markers = [
+    "agent: tests using real Claude Code sessions (uses subscription tokens)",
+    "integration: subprocess-based CLI integration tests",
+]
+addopts = "-m 'not agent'"
+testpaths = ["tests"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/stato"]
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "stato-website/",
+    "docs/prompt/",
+    ".claude/",
+    ".plandrop/",
+    ".stato/",
+    "STATO_INTEGRATION_TESTS.md",
+]
