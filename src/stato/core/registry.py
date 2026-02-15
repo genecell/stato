@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 # Default registry URL
-DEFAULT_REGISTRY = "https://raw.githubusercontent.com/genecell/stato-registry/master/index.toml"
+DEFAULT_REGISTRY = "https://raw.githubusercontent.com/genecell/stato/master/docs/registry/index.toml"
 
 
 @dataclass

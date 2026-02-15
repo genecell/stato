@@ -5,7 +5,7 @@ updated = "2026-02-14"
 [packages.stato-self]
 description = "Stato development expertise: compiler design, composition algebra, testing strategy, cross-platform bridges"
 author = "genecell"
-url = "https://github.com/genecell/stato-registry/raw/master/packages/stato-self.stato"
+url = "https://github.com/genecell/stato/raw/master/docs/registry/packages/stato-self.stato"
 version = "0.5.0"
 tags = ["python", "cli", "packaging", "compiler", "testing", "composition"]
 modules = 8
