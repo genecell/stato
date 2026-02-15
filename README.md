@@ -24,9 +24,15 @@ Stato combines what pip does (install, share, registry) with what a compiler doe
 
 What no existing tool does: the agent extracts its own knowledge (crystallization), privacy scanning before export, and a composition algebra for expertise modules.
 
+![Stato Overview](docs/figures/stato_figures.png)
+
 ## Install
 
     pip install stato
+
+Install from GitHub (latest development version):
+
+    pip install git+https://github.com/genecell/stato.git
 
 ## Quick Start
 
@@ -171,14 +177,13 @@ Browse and install shared expertise packages:
 
 ## Contributing
 
-    git clone https://github.com/genecell/stato.git
-    cd stato
-    pip install -e ".[dev]"
-    pytest tests/ -m "not agent" -v
+https://github.com/genecell/stato
 
-Run `stato resume` in the repo to understand the project architecture.
+Issues and PRs welcome.
 
-Full architecture documentation: [stato.hiniki.com/reference/architecture/](https://stato.hiniki.com/reference/architecture/)
+## Contact
+
+Min Dai — dai@broadinstitute.org
 
 ## Acknowledgments
 

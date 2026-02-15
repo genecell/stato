@@ -1,5 +1,11 @@
 # Stato Testing Guide
 
+## Dev Setup
+
+    git clone https://github.com/genecell/stato.git
+    cd stato
+    pip install -e ".[dev]"
+
 ## Overview
 
 Tests are split into two tiers with different cost profiles:
