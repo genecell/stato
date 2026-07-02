@@ -45,8 +45,8 @@ def detect_format(filepath: Path) -> SourceFormat:
     # Content-based detection
     content = filepath.read_text()
     lines = content.split("\n")
-    has_steps = any(l.strip().startswith("## Steps") for l in lines)
-    has_rules = any(l.strip().startswith("## Rules") for l in lines)
+    has_steps = any(line.strip().startswith("## Steps") for line in lines)
+    has_rules = any(line.strip().startswith("## Rules") for line in lines)
     if has_steps or has_rules:
         if lines and lines[0].strip().startswith("# "):
             return SourceFormat.SKILLKIT

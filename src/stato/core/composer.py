@@ -1,19 +1,70 @@
 """Composer — the agent algebra: snapshot, import, inspect, slice, graft."""
 from __future__ import annotations
 
+import hashlib
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
-from typing import Optional
 
 import tomli
 import tomli_w
 
 from stato import __version__
-
 from stato.core.compiler import validate
-from stato.core.module import ModuleType, ValidationResult, GraftResult
+from stato.core.module import GraftResult, ModuleType
 
+# Archive format v1: manifest carries format_version + per-module sha256
+# checksums. v0.5 archives (no format_version) are "legacy": importable,
+# but integrity cannot be verified.
+ARCHIVE_FORMAT_VERSION = "1"
+
+
+def _sha256(data: str) -> str:
+    return "sha256:" + hashlib.sha256(data.encode("utf-8")).hexdigest()
+
+
+def verify_archive(archive_path: Path) -> dict:
+    """Verify archive integrity against its manifest checksums.
+
+    Returns {"ok": bool, "legacy": bool, "format_version": str|None,
+             "mismatches": [rel_path, ...], "missing": [rel_path, ...]}.
+    """
+    with zipfile.ZipFile(archive_path, "r") as zf:
+        manifest = tomli.loads(zf.read("manifest.toml").decode("utf-8"))
+        fmt = manifest.get("format_version")
+        checksums = manifest.get("checksums", {})
+
+        if fmt is None:
+            return {
+                "ok": True, "legacy": True, "format_version": None,
+                "mismatches": [], "missing": [],
+            }
+
+        names = set(zf.namelist())
+        mismatches, missing = [], []
+        for member in manifest.get("included_modules", []):
+            if member not in names:
+                missing.append(member)
+                continue
+            expected = checksums.get(member)
+            if expected is None:
+                missing.append(member)
+                continue
+            actual = _sha256(zf.read(member).decode("utf-8"))
+            if actual != expected:
+                mismatches.append(member)
+
+    return {
+        "ok": not mismatches and not missing,
+        "legacy": False,
+        "format_version": fmt,
+        "mismatches": mismatches,
+        "missing": missing,
+    }
+
+
+class ArchiveIntegrityError(RuntimeError):
+    """Raised when an archive fails checksum verification."""
 
 # ---------------------------------------------------------------------------
 # Module discovery
@@ -86,10 +137,10 @@ def _filter_modules(
 # ---------------------------------------------------------------------------
 
 def _apply_template_reset(source: str, module_type: ModuleType) -> str:
-    from stato.modules.skill import reset_skill_for_template
-    from stato.modules.plan import reset_plan_for_template
-    from stato.modules.memory import reset_memory_for_template
     from stato.modules.context import reset_context_for_template
+    from stato.modules.memory import reset_memory_for_template
+    from stato.modules.plan import reset_plan_for_template
+    from stato.modules.skill import reset_skill_for_template
 
     resetters = {
         ModuleType.SKILL: reset_skill_for_template,
@@ -133,26 +184,32 @@ def snapshot(
             ignore_file=project_dir / ".statoignore",
         )
 
+    contents: dict[str, str] = {}
+    for mod in selected:
+        source = mod["full_path"].read_text()
+        if template:
+            source = _apply_template_reset(source, mod["module_type"])
+        if scanner:
+            source = scanner.sanitize(source)
+        contents[str(mod["rel_path"])] = source
+
     manifest = {
         "name": name,
         "description": description,
         "author": "",
         "created": datetime.now(timezone.utc).isoformat(),
         "stato_version": __version__,
+        "format_version": ARCHIVE_FORMAT_VERSION,
         "partial": is_partial,
         "template": template,
-        "included_modules": [str(m["rel_path"]) for m in selected],
+        "included_modules": list(contents.keys()),
+        "checksums": {path: _sha256(src) for path, src in contents.items()},
     }
 
     with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("manifest.toml", tomli_w.dumps(manifest))
-        for mod in selected:
-            source = mod["full_path"].read_text()
-            if template:
-                source = _apply_template_reset(source, mod["module_type"])
-            if scanner:
-                source = scanner.sanitize(source)
-            zf.writestr(str(mod["rel_path"]), source)
+        for path, src in contents.items():
+            zf.writestr(path, src)
 
     return output_path
 
@@ -168,11 +225,25 @@ def import_snapshot(
     types: list[str] | None = None,
     rename_as: str | None = None,
     dry_run: bool = False,
+    force: bool = False,
 ) -> list[str]:
     """Extract modules from .stato archive into project's .stato/.
 
+    Verifies manifest checksums first (archive format v1); a tampered
+    archive raises ArchiveIntegrityError unless force=True. Legacy
+    (pre-v1) archives import without verification.
+
     Returns list of imported module relative paths.
     """
+    integrity = verify_archive(archive_path)
+    if not integrity["ok"] and not force:
+        bad = integrity["mismatches"] + integrity["missing"]
+        raise ArchiveIntegrityError(
+            f"Archive failed integrity check ({', '.join(bad)}). "
+            "Contents differ from the manifest checksums — the archive was "
+            "modified after creation. Re-create it or pass force to override."
+        )
+
     as_dir = project_dir / ".stato"
     as_dir.mkdir(parents=True, exist_ok=True)
     (as_dir / "skills").mkdir(exist_ok=True)
@@ -235,6 +306,8 @@ def inspect_archive(archive_path: Path) -> dict:
                 "valid": result.success,
             })
 
+    integrity = verify_archive(archive_path)
+
     return {
         "name": manifest.get("name", ""),
         "description": manifest.get("description", ""),
@@ -243,6 +316,8 @@ def inspect_archive(archive_path: Path) -> dict:
         "partial": manifest.get("partial", False),
         "modules": manifest.get("included_modules", []),
         "module_details": module_info,
+        "format_version": integrity["format_version"],
+        "integrity": integrity,
     }
 
 
@@ -297,22 +372,27 @@ def slice_modules(
     if output_path is None:
         output_path = project_dir / f"{name}.stato"
 
+    contents = {
+        str(m["rel_path"]): m["full_path"].read_text() for m in selected
+    }
+
     manifest = {
         "name": name,
         "description": f"Sliced modules: {', '.join(modules)}",
         "author": "",
         "created": datetime.now(timezone.utc).isoformat(),
         "stato_version": __version__,
+        "format_version": ARCHIVE_FORMAT_VERSION,
         "partial": True,
         "template": False,
-        "included_modules": [str(m["rel_path"]) for m in selected],
+        "included_modules": list(contents.keys()),
+        "checksums": {path: _sha256(src) for path, src in contents.items()},
     }
 
     with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("manifest.toml", tomli_w.dumps(manifest))
-        for mod in selected:
-            source = mod["full_path"].read_text()
-            zf.writestr(str(mod["rel_path"]), source)
+        for path, src in contents.items():
+            zf.writestr(path, src)
 
     return output_path, warnings
 
@@ -327,12 +407,21 @@ def graft(
     module: str | None = None,
     rename_as: str | None = None,
     on_conflict: str = "ask",
+    dry_run: bool = False,
 ) -> GraftResult:
     """Add module from external source (.stato archive or single .py file)."""
     as_dir = project_dir / ".stato"
     result = GraftResult(success=False)
 
     if zipfile.is_zipfile(source_path):
+        integrity = verify_archive(source_path)
+        if not integrity["ok"]:
+            bad = integrity["mismatches"] + integrity["missing"]
+            result.has_conflict = True
+            result.conflicts.append(
+                f"Archive failed integrity check: {', '.join(bad)}"
+            )
+            return result
         with zipfile.ZipFile(source_path, "r") as zf:
             manifest = tomli.loads(zf.read("manifest.toml").decode("utf-8"))
             members = manifest.get("included_modules", [])
@@ -348,7 +437,7 @@ def graft(
                 source_code = zf.read(member).decode("utf-8")
                 _graft_single(
                     as_dir, member, source_code,
-                    rename_as, on_conflict, result,
+                    rename_as, on_conflict, result, dry_run,
                 )
     else:
         # Single .py file
@@ -358,7 +447,7 @@ def graft(
             rel_path = f"skills/{rel_path}"
         _graft_single(
             as_dir, rel_path, source_code,
-            rename_as, on_conflict, result,
+            rename_as, on_conflict, result, dry_run,
         )
 
     if not result.has_conflict or on_conflict in ("replace", "rename", "skip"):
@@ -374,6 +463,7 @@ def _graft_single(
     rename_as: str | None,
     on_conflict: str,
     result: GraftResult,
+    dry_run: bool = False,
 ) -> None:
     """Graft a single module file into the project."""
     vr = validate(source)
@@ -414,9 +504,10 @@ def _graft_single(
             return
 
     # Write
-    target.parent.mkdir(parents=True, exist_ok=True)
-    write_source = vr.corrected_source or source
-    target.write_text(write_source)
+    if not dry_run:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        write_source = vr.corrected_source or source
+        target.write_text(write_source)
     result.imported_modules.append(target_rel)
     result.validation = vr
 

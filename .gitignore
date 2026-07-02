@@ -2,6 +2,9 @@
 .DS_Store
 Thumbs.db
 
+.ruff_cache/
+
+
 # IDE
 .vscode/
 .idea/
@@ -30,12 +33,17 @@ stato-website/
 # Claude Code (users generate their own)
 .claude/
 CLAUDE.md
+# Other similar files
+AGENTS.md
 
 # Development files (keep in dev only)
 docs/prompt/
+docs/discussion/
 
 # Test cache
 .pytest_cache/
 
 # Stato runtime (users generate their own)
 .stato/prompts/
+
+.plandrop

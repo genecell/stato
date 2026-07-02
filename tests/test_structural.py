@@ -8,22 +8,21 @@ from pathlib import Path
 
 import tomli
 
-from stato.core.state_manager import init_project, write_module
+from stato.bridge.claude_code import generate_bridge
 from stato.core.composer import (
-    snapshot,
+    graft,
     import_snapshot,
     inspect_archive,
     slice_modules,
-    graft,
+    snapshot,
 )
-from stato.bridge.claude_code import generate_bridge
+from stato.core.state_manager import init_project, write_module
 from tests.fixtures import (
-    VALID_QC_SKILL,
-    VALID_NORMALIZE_SKILL,
     VALID_CLUSTER_SKILL,
-    VALID_PLAN,
     VALID_MEMORY,
-    VALID_CONTEXT,
+    VALID_NORMALIZE_SKILL,
+    VALID_PLAN,
+    VALID_QC_SKILL,
 )
 
 
@@ -285,14 +284,17 @@ class Skill{i}:
 
 # --- Cursor + Codex bridges ---
 
-def test_cursor_bridge_generates_cursorrules(tmp_path):
-    """Cursor bridge creates .cursorrules with skill content."""
+def test_cursor_bridge_generates_mdc(tmp_path):
+    """Cursor bridge creates .cursor/rules/stato.mdc (modern format) with frontmatter."""
     from stato.bridge.cursor import generate_bridge
     project = init_project(tmp_path)
     write_module(project, "skills/qc.py", VALID_QC_SKILL)
     generate_bridge(project, force=True)
-    assert (tmp_path / ".cursorrules").exists()
-    content = (tmp_path / ".cursorrules").read_text()
+    mdc = tmp_path / ".cursor" / "rules" / "stato.mdc"
+    assert mdc.exists()
+    content = mdc.read_text()
+    assert content.startswith("---\n")  # YAML frontmatter must be first
+    assert "alwaysApply: true" in content
     assert "qc_filtering" in content
 
 
@@ -319,8 +321,9 @@ def test_bridge_includes_memory_and_resume_rules(tmp_path):
 
 
 def test_bridge_all_generates_all_platforms(tmp_path):
-    """bridge --platform all generates all 4 platform files."""
+    """bridge --platform all generates every built-in (non-legacy) platform file."""
     from click.testing import CliRunner
+
     from stato.cli import main
 
     project = init_project(tmp_path)
@@ -329,10 +332,47 @@ def test_bridge_all_generates_all_platforms(tmp_path):
     runner = CliRunner()
     result = runner.invoke(main, ["bridge", "--platform", "all", "--path", str(tmp_path)])
     assert result.exit_code == 0
-    assert (tmp_path / "CLAUDE.md").exists()
-    assert (tmp_path / ".cursorrules").exists()
     assert (tmp_path / "AGENTS.md").exists()
+    assert (tmp_path / "CLAUDE.md").exists()
+    assert (tmp_path / ".cursor" / "rules" / "stato.mdc").exists()
+    assert (tmp_path / ".github" / "copilot-instructions.md").exists()
+    assert (tmp_path / "GEMINI.md").exists()
     assert (tmp_path / "README.stato.md").exists()
+    # legacy format is NOT produced by 'all'
+    assert not (tmp_path / ".cursorrules").exists()
+
+
+def test_bridge_default_uses_config_platforms(tmp_path):
+    """bridge with no --platform generates config bridge.platforms (agents+claude)."""
+    from click.testing import CliRunner
+
+    from stato.cli import main
+
+    project = init_project(tmp_path)
+    write_module(project, "skills/qc.py", VALID_QC_SKILL)
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["bridge", "--path", str(tmp_path)])
+    assert result.exit_code == 0
+    assert (tmp_path / "AGENTS.md").exists()
+    assert (tmp_path / "CLAUDE.md").exists()
+
+
+def test_bridge_codex_alias(tmp_path):
+    """--platform codex still works as an alias for agents."""
+    from click.testing import CliRunner
+
+    from stato.cli import main
+
+    project = init_project(tmp_path)
+    write_module(project, "skills/qc.py", VALID_QC_SKILL)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        main, ["bridge", "--platform", "codex", "--path", str(tmp_path)]
+    )
+    assert result.exit_code == 0
+    assert (tmp_path / "AGENTS.md").exists()
 
 
 def test_bridge_marker_in_output(tmp_path):
@@ -366,7 +406,7 @@ def test_bridge_overwrites_stato_generated_file(tmp_path):
 
 def test_bridge_detects_existing_non_stato_file(tmp_path):
     """check_existing_bridge detects a non-stato file."""
-    from stato.bridge.base import check_existing_bridge, STATO_MARKER
+    from stato.bridge.base import STATO_MARKER, check_existing_bridge
 
     # Write a hand-crafted CLAUDE.md (no stato marker)
     claude_md = tmp_path / "CLAUDE.md"
@@ -406,6 +446,7 @@ def test_bridge_force_overwrites(tmp_path):
 def test_crystallize_saves_to_file(tmp_path):
     """crystallize saves prompt to .stato/prompts/crystallize.md by default."""
     from click.testing import CliRunner
+
     from stato.cli import main
 
     runner = CliRunner()
@@ -424,6 +465,7 @@ def test_crystallize_saves_to_file(tmp_path):
 def test_crystallize_print_flag(tmp_path):
     """crystallize --print prints full prompt and saves to file."""
     from click.testing import CliRunner
+
     from stato.cli import main
 
     runner = CliRunner()
@@ -439,6 +481,7 @@ def test_crystallize_print_flag(tmp_path):
 def test_crystallize_web(tmp_path):
     """crystallize --web prints web prompt and saves to file."""
     from click.testing import CliRunner
+
     from stato.cli import main
 
     runner = CliRunner()

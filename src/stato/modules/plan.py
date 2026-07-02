@@ -2,10 +2,8 @@
 from __future__ import annotations
 
 import ast
-import re
-from typing import Optional
 
-from stato.core.module import Diagnostic, Severity
+from stato.core.module import Diagnostic
 
 ALLOWED_STATUSES = {"pending", "running", "complete", "failed", "blocked"}
 
@@ -20,7 +18,7 @@ class PlanHelpers:
     """Computed properties for a plan module."""
 
     @staticmethod
-    def current_step(steps: list[dict]) -> Optional[dict]:
+    def current_step(steps: list[dict]) -> dict | None:
         """Return the step with status 'running', or None."""
         for s in steps:
             if s.get("status") == "running":
@@ -28,7 +26,7 @@ class PlanHelpers:
         return None
 
     @staticmethod
-    def next_step(steps: list[dict]) -> Optional[dict]:
+    def next_step(steps: list[dict]) -> dict | None:
         """Return the first 'pending' step whose dependencies are all 'complete'."""
         complete_ids = {s["id"] for s in steps if s.get("status") == "complete"}
         for s in steps:
@@ -90,7 +88,7 @@ def _reset_steps_node(node: ast.expr) -> None:
             continue
 
         keys_to_remove = []
-        for i, (key, value) in enumerate(zip(elt.keys, elt.values)):
+        for i, (key, _value) in enumerate(zip(elt.keys, elt.values, strict=False)):
             if isinstance(key, ast.Constant):
                 if key.value == "status":
                     # Reset to "pending"

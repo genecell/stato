@@ -6,14 +6,13 @@ import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from pathlib import Path
-
-from stato import __version__
+from pathlib import Path, PurePosixPath
 
 import tomli
 import tomli_w
 
-from stato.core.module import ModuleType, infer_module_type
+from stato import __version__
+from stato.core.module import infer_module_type
 
 
 class MergeStrategy(Enum):
@@ -61,28 +60,31 @@ def extract_archive(archive_path: Path, target_dir: Path) -> None:
 def create_archive(source_dir: Path, output_path: Path,
                    name: str = "merged") -> Path:
     """Pack a directory of modules into a .stato archive."""
-    modules_list = []
+    from stato.core.composer import ARCHIVE_FORMAT_VERSION, _sha256
+
+    contents: dict[str, str] = {}
     for py_file in sorted(source_dir.rglob("*.py")):
         if py_file.name.startswith("__"):
             continue
-        rel = str(py_file.relative_to(source_dir))
-        modules_list.append(rel)
+        rel = str(PurePosixPath(py_file.relative_to(source_dir)))
+        contents[rel] = py_file.read_text()
 
     manifest = {
         "name": name,
-        "description": f"Merged archive",
+        "description": "Merged archive",
         "author": "",
         "created": datetime.now(timezone.utc).isoformat(),
         "stato_version": __version__,
+        "format_version": ARCHIVE_FORMAT_VERSION,
         "partial": False,
         "template": False,
-        "included_modules": modules_list,
+        "included_modules": list(contents.keys()),
+        "checksums": {path: _sha256(src) for path, src in contents.items()},
     }
 
     with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("manifest.toml", tomli_w.dumps(manifest))
-        for rel in modules_list:
-            source = (source_dir / rel).read_text()
+        for rel, source in contents.items():
             zf.writestr(rel, source)
 
     return output_path
@@ -108,7 +110,7 @@ def discover_modules(stato_dir: Path) -> dict[str, str]:
 # ---------------------------------------------------------------------------
 
 def extract_module_fields(source: str) -> dict | None:
-    """Execute source and extract class fields + inferred type."""
+    """Extract class fields + inferred type via AST (module code never executed)."""
     try:
         tree = ast.parse(source)
     except SyntaxError:
@@ -123,13 +125,13 @@ def extract_module_fields(source: str) -> dict | None:
     if class_node is None:
         return None
 
-    namespace: dict = {}
-    try:
-        exec(source, namespace)
-    except Exception:
+    from stato.core.astload import materialize
+
+    mat = materialize(source, class_node)
+    if mat.namespace is None:
         return None
 
-    cls = namespace.get(class_node.name)
+    cls = mat.namespace.get(class_node.name)
     if cls is None:
         return None
 

@@ -1,7 +1,6 @@
 """Bundle parser and import-bundle roundtrip tests."""
-from pathlib import Path
 
-from stato.core.bundle import parse_bundle, BundleParseResult
+from stato.core.bundle import parse_bundle
 from stato.core.state_manager import init_project, write_module
 
 

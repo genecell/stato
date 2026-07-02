@@ -32,23 +32,23 @@ def _extract_class_fields(source: str) -> dict:
     if class_node is None:
         return {}
 
-    # Execute to get runtime values
-    namespace = {}
-    try:
-        exec(source, namespace)
-    except Exception:
-        return {}
+    # Literal values via AST — module code is never executed
+    from stato.core.astload import materialize
 
-    cls = namespace.get(class_node.name)
-    if cls is None:
+    result = materialize(source, class_node)
+    if result.namespace is None:
         return {}
+    cls = result.namespace[class_node.name]
 
     fields = {}
     for node in class_node.body:
         if isinstance(node, ast.Assign):
             for target in node.targets:
                 if isinstance(target, ast.Name):
-                    fields[target.id] = repr(getattr(cls, target.id, None))
+                    if target.id in result.skipped_fields:
+                        fields[target.id] = "<non-literal value>"
+                    else:
+                        fields[target.id] = repr(getattr(cls, target.id, None))
     return fields
 
 

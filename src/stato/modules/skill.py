@@ -1,7 +1,7 @@
 """SkillModule schema helpers and template reset."""
 from __future__ import annotations
 
-from stato.core.module import Diagnostic, Severity
+from stato.core.module import Diagnostic
 
 
 def validate_skill(namespace: dict, class_name: str) -> list[Diagnostic]:

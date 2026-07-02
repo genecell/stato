@@ -5,7 +5,7 @@
 Capture, validate, and transfer AI agent expertise.
 
 [![PyPI](https://img.shields.io/pypi/v/stato)](https://pypi.org/project/stato/)
-[![Tests](https://img.shields.io/badge/tests-130%2B%20passing-green)]()
+[![Tests](https://img.shields.io/badge/tests-294%20passing-green)]()
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)]()
 [![License](https://img.shields.io/badge/license-MIT-green)]()
 
@@ -23,6 +23,22 @@ Stato combines what pip does (install, share, registry) with what a compiler doe
 | Git | Snapshot, diff, and merge expertise |
 
 What no existing tool does: the agent extracts its own knowledge (crystallization), privacy scanning before export, and a composition algebra for expertise modules.
+
+> **Compaction is your agent's working memory. Stato is its long-term memory —
+> validated, on disk, portable.** Where Mem0/Zep/Letta are services and skills
+> marketplaces distribute single skills, stato distributes *whole validated
+> cognitive-state archives* (context + plan + memory + skills) that any tool
+> and any teammate can load.
+
+### Three ways stato integrates with your agent
+
+A tool needs only one tier to work with stato; each higher tier deepens it.
+
+| Tier | What it does | How |
+|---|---|---|
+| **Instructions** | Static index any tool reads | `stato bridge` → AGENTS.md, CLAUDE.md, `.cursor/rules/*.mdc`, copilot, GEMINI.md, SKILL.md |
+| **Hooks** | Auto-restore state after compaction | `stato hooks install` → Claude Code, Codex CLI, Gemini CLI |
+| **MCP** | Live state + validate-gated writes | `stato mcp` → every MCP client at once |
 
 ![Stato Overview](docs/figures/stato_figures.png)
 

@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import ast
-from stato.core.module import Diagnostic, Severity
+
+from stato.core.module import Diagnostic
 
 
 def validate_memory(namespace: dict, class_name: str) -> list[Diagnostic]:
@@ -26,8 +27,6 @@ def reset_memory_for_template(source: str) -> str:
             break
     if class_node is None:
         return source
-
-    nodes_to_remove = []
 
     for node in class_node.body:
         if not isinstance(node, ast.Assign):

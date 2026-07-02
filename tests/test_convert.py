@@ -1,9 +1,9 @@
 """Tests for the convert command — importing from CLAUDE.md, .cursorrules, etc."""
 from stato.core.converter import (
-    detect_format,
-    convert_file,
     ConvertResult,
     SourceFormat,
+    convert_file,
+    detect_format,
 )
 from stato.core.state_manager import init_project, write_module
 

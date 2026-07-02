@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 
 class ModuleType(str, Enum):
@@ -25,19 +24,19 @@ class Diagnostic:
     code: str
     message: str
     severity: Severity
-    line: Optional[int] = None
+    line: int | None = None
 
 
 @dataclass
 class ValidationResult:
     success: bool
-    module_type: Optional[ModuleType] = None
-    class_name: Optional[str] = None
+    module_type: ModuleType | None = None
+    class_name: str | None = None
     hard_errors: list[Diagnostic] = field(default_factory=list)
     auto_corrections: list[Diagnostic] = field(default_factory=list)
     advice: list[Diagnostic] = field(default_factory=list)
-    corrected_source: Optional[str] = None
-    namespace: Optional[dict] = None
+    corrected_source: str | None = None
+    namespace: dict | None = None
 
 
 @dataclass
@@ -46,13 +45,20 @@ class GraftResult:
     has_conflict: bool = False
     conflicts: list[str] = field(default_factory=list)
     dependency_warnings: list[str] = field(default_factory=list)
-    validation: Optional[ValidationResult] = None
+    validation: ValidationResult | None = None
     imported_modules: list[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
 # Module schemas: field_name -> (expected_type, required)
 # ---------------------------------------------------------------------------
+
+# Provenance fields accepted on every module type (all optional)
+PROVENANCE_FIELDS = {
+    "created_at": str,     # ISO date/datetime the module was first written
+    "updated_at": str,     # ISO date/datetime of last meaningful update
+    "source": str,         # where this knowledge came from, e.g. "debugging session 2026-06-12"
+}
 
 SKILL_SCHEMA = {
     "required_fields": ["name"],
@@ -66,8 +72,12 @@ SKILL_SCHEMA = {
         "output_schema": dict,
         "default_params": dict,
         "lessons_learned": str,
+        "lessons": list,          # structured: [{condition, recommendation, confidence, review_by}]
+        "confidence": float,      # 0.0-1.0 overall trust in this skill
+        "used_in_steps": list,    # plan step ids this skill serves
         "tags": list,
         "context_requires": list,
+        **PROVENANCE_FIELDS,
     },
 }
 
@@ -77,11 +87,12 @@ PLAN_SCHEMA = {
     "field_types": {
         "name": str,
         "objective": str,
-        "steps": list,
+        "steps": list,          # step dicts may carry skills_used: [skill names]
         "version": str,
         "decision_log": str,
         "constraints": list,
         "created_by": str,
+        **PROVENANCE_FIELDS,
     },
 }
 
@@ -97,6 +108,7 @@ MEMORY_SCHEMA = {
         "decisions": list,
         "metadata": dict,
         "last_updated": str,
+        **PROVENANCE_FIELDS,
     },
 }
 
@@ -114,6 +126,7 @@ CONTEXT_SCHEMA = {
         "completed_tasks": list,
         "team": list,
         "notes": str,
+        **PROVENANCE_FIELDS,
     },
 }
 
@@ -126,6 +139,7 @@ PROTOCOL_SCHEMA = {
         "description": str,
         "validation_rules": list,
         "error_handling": str,
+        **PROVENANCE_FIELDS,
     },
 }
 

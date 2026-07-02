@@ -3,9 +3,9 @@ from stato.core.resume import generate_resume
 from stato.core.state_manager import init_project, write_module
 from tests.fixtures import (
     VALID_CONTEXT,
+    VALID_MEMORY,
     VALID_PLAN,
     VALID_QC_SKILL,
-    VALID_MEMORY,
 )
 
 

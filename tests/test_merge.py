@@ -2,19 +2,14 @@
 import zipfile
 from pathlib import Path
 
-import pytest
 import tomli_w
 
 from stato.core.merger import (
     MergeStrategy,
-    merge_archives,
     extract_archive,
-    create_archive,
-    discover_modules,
-    extract_module_fields,
+    merge_archives,
 )
-from tests.fixtures import VALID_QC_SKILL, VALID_NORMALIZE_SKILL, VALID_MEMORY, VALID_CONTEXT
-
+from tests.fixtures import VALID_NORMALIZE_SKILL, VALID_QC_SKILL
 
 # ---------------------------------------------------------------------------
 # Test helper
@@ -262,7 +257,7 @@ def test_merge_empty_archive(tmp_path):
     left = create_test_archive(tmp_path, "left", {
         "skills/qc.py": VALID_QC_SKILL,
     })
-    right = create_test_archive(tmp_path, "right", {})
+    create_test_archive(tmp_path, "right", {})
 
     left_dir = tmp_path / "left_dir"
     right_dir = tmp_path / "right_dir"

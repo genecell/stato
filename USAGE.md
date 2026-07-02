@@ -685,3 +685,123 @@ The compiler runs a 7-pass pipeline on every module. Diagnostics are grouped int
 | I003 | No `lessons_learned` on skill |
 | I004 | No `decision_log` on plan |
 | I006 | `run()` has no type hints |
+
+---
+
+## What's new in v0.6
+
+### Machine-readable output (`--json`)
+
+All read commands support `--json` for scripting and CI:
+
+```bash
+stato status --json
+stato validate .stato/ --json
+stato resume --json
+stato inspect archive.stato --json
+stato find "batch effect" --json
+stato registry search scrna --json
+stato diff a.stato b.stato --json
+```
+
+Global flags: `-q/--quiet` (errors only; `--json` still prints), and `--dry-run`
+on `snapshot`, `slice`, and `graft`.
+
+### Local search
+
+```bash
+stato find "qc filtering"     # token + fuzzy match over names, descriptions, tags, lessons
+```
+
+### Configuration
+
+Layered TOML config (`~/.config/stato/config.toml` → `.stato/config.toml` → env
+vars → CLI flags):
+
+```bash
+stato config                  # show effective config + where each value comes from
+stato config --init user      # write a commented template
+stato config --init project
+```
+
+Keys: `[registry] url`, `[privacy] disable/extra_patterns`, `[bridge]
+default/platforms`, `[validate] strict/suppress`, `[history] keep`,
+`[hooks] freshness_gate`, `[plugins] enabled`. Env: `STATO_REGISTRY_URL`,
+`STATO_CONFIG_DIR`.
+
+### Bridges (ecosystem-current)
+
+```bash
+stato bridge --platform agents      # AGENTS.md (primary; cross-tool standard)
+stato bridge --platform claude      # CLAUDE.md
+stato bridge --platform cursor      # .cursor/rules/stato.mdc (modern format)
+stato bridge --platform copilot     # .github/copilot-instructions.md
+stato bridge --platform gemini      # GEMINI.md
+stato bridge --platform skill       # .claude/skills/.../SKILL.md (Agent Skills)
+stato bridge --platform all         # every built-in platform
+```
+
+`codex` is an alias for `agents`. Default (no `--platform`) uses
+`[bridge] platforms` from config (agents + claude).
+
+### Hooks — auto-restore state after compaction
+
+```bash
+stato hooks install                 # all three CLIs
+stato hooks install --platform claude --dry-run
+stato hooks status
+stato hooks uninstall
+```
+
+Wires PreCompact/SessionStart (and platform equivalents) so validated `.stato/`
+state re-enters context after every compaction. Works in headless `claude -p`.
+
+### MCP server — live state for any MCP client
+
+```bash
+pip install "stato[mcp]"
+stato init --mcp                    # write .mcp.json entry
+stato mcp                           # run the server (stdio)
+```
+
+Exposes resources (`stato://context|plan|memory|resume|skills`), tools
+(`stato_validate`, `stato_write_module`, `stato_resume`, `stato_snapshot`,
+`stato_registry_search`), and prompts (crystallize). `stato_write_module`
+returns compiler diagnostics in the tool result, so an agent self-corrects
+invalid modules in the same turn.
+
+### Shell completion
+
+```bash
+eval "$(_STATO_COMPLETE=bash_source stato)"    # bash; zsh_source / fish_source also work
+```
+
+### New diagnostic codes
+
+| Code | Meaning |
+|---|---|
+| E011 | Unknown `__stato_type__` value |
+| E012 | Plan step `skills_used` must be a list of strings |
+| I007 | Non-literal field value (stored, not statically checkable) |
+| I008 | Malformed structured `lessons` entry or out-of-range `confidence` |
+| W007 | Field extraction issue |
+| W008 | `__stato_type__` overrides the expected type |
+
+Use `stato validate --strict` to treat warnings/advice as errors, and
+`--suppress I006` to hide specific codes.
+
+### Teaching agents how to use stato (`stato skill`)
+
+Install the canonical stato Agent Skill so any coding agent knows the workflow:
+
+```bash
+stato skill install                 # -> .claude/skills/stato/SKILL.md
+stato skill install --tool all      # claude, codex, cursor, gemini
+stato skill install --tool gemini --user   # into your home config (all projects)
+stato skill show                    # print it (pipe anywhere)
+```
+
+The same spec-valid SKILL.md works across tools — only the target directory
+differs. It teaches the operating loop, module schemas, key commands, and the
+MCP/hooks integration. (This is distinct from `stato bridge --platform skill`,
+which exports *a project's* captured expertise as a skill.)

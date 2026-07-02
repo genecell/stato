@@ -4,17 +4,16 @@ Run after EVERY change: pytest tests/test_compiler.py
 """
 from stato.core.compiler import validate
 from stato.core.module import ModuleType
-from stato.core.state_manager import init_project, write_module, rollback
+from stato.core.state_manager import init_project, rollback, write_module
 from tests.fixtures import (
-    VALID_QC_SKILL,
-    VALID_PLAN,
-    VALID_MEMORY,
-    VALID_CONTEXT,
-    CORRUPTED_SKILL_MISSING_FIELDS,
     CORRUPTED_SKILL_BAD_TYPES,
+    CORRUPTED_SKILL_MISSING_FIELDS,
     FIXABLE_SKILL,
+    VALID_CONTEXT,
+    VALID_MEMORY,
+    VALID_PLAN,
+    VALID_QC_SKILL,
 )
-
 
 # --- Valid modules pass ---
 

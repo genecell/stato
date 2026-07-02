@@ -12,11 +12,10 @@ import pytest
 
 from stato.core.state_manager import init_project, write_module
 from tests.fixtures import (
-    VALID_QC_SKILL,
+    VALID_CONTEXT,
     VALID_NORMALIZE_SKILL,
     VALID_PLAN,
-    VALID_MEMORY,
-    VALID_CONTEXT,
+    VALID_QC_SKILL,
 )
 
 pytestmark = pytest.mark.integration

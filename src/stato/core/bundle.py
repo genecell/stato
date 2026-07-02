@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import ast
-from pathlib import Path
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass
@@ -42,7 +42,7 @@ def parse_bundle(bundle_path: Path) -> BundleParseResult:
 
                     if name == "SKILLS" and isinstance(node.value, ast.Dict):
                         # Extract each skill from the dict
-                        for key, value in zip(node.value.keys, node.value.values):
+                        for key, value in zip(node.value.keys, node.value.values, strict=False):
                             if isinstance(key, ast.Constant) and isinstance(value, ast.Constant):
                                 skill_name = key.value
                                 skill_source = value.value

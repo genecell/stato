@@ -1,9 +1,9 @@
 """
 Diff tests. Pure Python, no LLM.
 """
-from stato.core.state_manager import init_project, write_module
 from stato.core.composer import snapshot
 from stato.core.differ import diff_modules, diff_snapshots, diff_vs_backup
+from stato.core.state_manager import init_project, write_module
 from tests.fixtures import VALID_QC_SKILL
 
 

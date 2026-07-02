@@ -46,18 +46,29 @@ class SkillName:
     default_params = {
         "param": value,  # why this value
     }
+    created_at = "YYYY-MM-DD"       # when first captured
+    updated_at = "YYYY-MM-DD"       # when last refined
+    source = "how you learned this, e.g. 'debugging session 2026-06-12'"
+    confidence = 0.8                # 0-1: how sure you are this holds
     lessons_learned = \"\"\"
     - What worked and why
     - What didn't work and why
     - Edge cases and gotchas
     - Parameter values refined through experimentation
     \"\"\"
+    # Optional: structured lessons for programmatic querying
+    lessons = [
+        {"condition": "when this applies", "recommendation": "what to do",
+         "confidence": 0.9, "review_by": "YYYY-MM-DD"},
+    ]
     @staticmethod
     def run(**kwargs):
         pass
 ```
 
 Write one skill per major capability. Use descriptive filenames.
+Optionally add `__stato_type__ = "skill"` to declare the type explicitly
+instead of relying on inference.
 
 ## Step 3: Create PLAN module
 Write .stato/plan.py reflecting your analysis/development pipeline:
@@ -82,10 +93,17 @@ Write .stato/memory.py:
 ```python
 class ProjectState:
     phase = "current_phase"
+    updated_at = "YYYY-MM-DD"
+    source = "session recap"
     tasks = ["remaining", "tasks"]
     known_issues = {"issue": "description"}
     reflection = \"\"\"
     Where the project stands and what to do next.
+
+    Working notes: open hypotheses you haven't confirmed, what you just tried
+    and why, and the very next thing to check. Capture this conversational
+    thread deliberately — it is the part that a fresh session (after /clear or
+    a new terminal) would otherwise lose, since the compaction summary is gone.
     \"\"\"
 ```
 
@@ -168,10 +186,14 @@ class ProjectPlan:
 MEMORY = \'\'\'
 class ProjectState:
     phase = "current_phase"
+    updated_at = "YYYY-MM-DD"
     tasks = ["remaining", "tasks"]
     known_issues = {"issue": "description"}
     reflection = \"\"\"
     Summary of where things stand.
+
+    Working notes: open hypotheses, what was just tried and why, and the next
+    thing to check — the conversational thread a fresh session would lose.
     \"\"\"
 \'\'\'
 

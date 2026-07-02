@@ -10,24 +10,36 @@ from __future__ import annotations
 import ast
 import re
 import textwrap
-from typing import Optional
 
 from stato.core.module import (
+    MODULE_SCHEMAS,
+    Diagnostic,
     ModuleType,
     Severity,
-    Diagnostic,
     ValidationResult,
-    MODULE_SCHEMAS,
     infer_module_type,
 )
-
 
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
-def validate(source: str, expected_type: str | None = None) -> ValidationResult:
-    """Run the 7-pass validation pipeline on Python source code."""
+def validate(
+    source: str,
+    expected_type: str | None = None,
+    strict: bool = False,
+    suppress: list[str] | None = None,
+) -> ValidationResult:
+    """Run the 7-pass validation pipeline on Python source code.
+
+    strict: treat auto-corrections and advice as hard errors.
+    suppress: diagnostic codes (e.g. ["I006"]) to drop from the result.
+    """
+    result = _validate_inner(source, expected_type)
+    return _apply_policy(result, strict=strict, suppress=suppress or [])
+
+
+def _validate_inner(source: str, expected_type: str | None = None) -> ValidationResult:
     errors: list[Diagnostic] = []
     warnings: list[Diagnostic] = []
     advice: list[Diagnostic] = []
@@ -41,6 +53,15 @@ def validate(source: str, expected_type: str | None = None) -> ValidationResult:
     class_node, class_name, has_docstring = _pass_structure(tree, errors, warnings)
     if class_node is None:
         return _build_result(errors, warnings, advice, success=False)
+
+    # Explicit type declaration: __stato_type__ = "skill" overrides inference
+    declared_type = _extract_declared_type(class_node, errors, warnings, expected_type)
+    if errors:
+        return _build_result(
+            errors, warnings, advice, success=False, class_name=class_name,
+        )
+    if declared_type is not None:
+        expected_type = declared_type
 
     # Pass 3: Type Inference
     field_names, method_names = _extract_members(class_node)
@@ -68,9 +89,9 @@ def validate(source: str, expected_type: str | None = None) -> ValidationResult:
             module_type=module_type, class_name=class_name,
         )
 
-    # Pass 6: Execute
+    # Pass 6: Materialize (AST-only — module code is never executed)
     exec_source = corrected_source or source
-    namespace = _pass_execute(exec_source, class_name, module_type, errors)
+    namespace = _pass_materialize(exec_source, class_name, module_type, errors, advice)
     if errors:
         return _build_result(
             errors, warnings, advice, success=False,
@@ -186,6 +207,69 @@ def compile_from_markdown(markdown: str) -> tuple[str, ValidationResult]:
 
     result = validate(source)
     return source, result
+
+
+# ---------------------------------------------------------------------------
+# Validation policy (strict mode, suppression)
+# ---------------------------------------------------------------------------
+
+def _apply_policy(
+    result: ValidationResult, strict: bool, suppress: list[str]
+) -> ValidationResult:
+    if suppress:
+        keep = lambda d: d.code not in suppress  # noqa: E731
+        result.hard_errors = [d for d in result.hard_errors if keep(d)]
+        result.auto_corrections = [d for d in result.auto_corrections if keep(d)]
+        result.advice = [d for d in result.advice if keep(d)]
+        if not result.hard_errors and not result.success and result.namespace is not None:
+            result.success = True
+
+    if strict and (result.auto_corrections or result.advice):
+        result.hard_errors.extend(result.auto_corrections)
+        result.hard_errors.extend(result.advice)
+        result.auto_corrections = []
+        result.advice = []
+        result.success = False
+
+    return result
+
+
+def _extract_declared_type(
+    class_node: ast.ClassDef,
+    errors: list[Diagnostic],
+    warnings: list[Diagnostic],
+    expected_type: str | None,
+) -> str | None:
+    """Read an explicit __stato_type__ = "<type>" class attribute if present."""
+    for node in class_node.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        for target in node.targets:
+            if isinstance(target, ast.Name) and target.id == "__stato_type__":
+                try:
+                    value = ast.literal_eval(node.value)
+                except (ValueError, TypeError, SyntaxError):
+                    value = None
+                valid = {t.value for t in ModuleType}
+                if not isinstance(value, str) or value not in valid:
+                    errors.append(Diagnostic(
+                        code="E011",
+                        message=f"Unknown __stato_type__ {value!r}. "
+                                f"Allowed: {', '.join(sorted(valid))}",
+                        severity=Severity.ERROR,
+                        line=node.lineno,
+                    ))
+                    return None
+                if expected_type and expected_type != value:
+                    warnings.append(Diagnostic(
+                        code="W008",
+                        message=f"Declared __stato_type__ '{value}' overrides "
+                                f"expected type '{expected_type}'",
+                        severity=Severity.WARNING,
+                        line=node.lineno,
+                    ))
+                return value
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -324,26 +408,10 @@ def _extract_members(class_node: ast.ClassDef) -> tuple[set[str], set[str]]:
 
 
 def _extract_field_values(source: str, class_node: ast.ClassDef) -> dict:
-    """Execute the source and extract field values from the class."""
-    namespace = {}
-    try:
-        exec(source, namespace)
-    except Exception:
-        return {}
+    """Extract literal field values from the class without executing it."""
+    from stato.core.astload import extract_field_values
 
-    cls = namespace.get(class_node.name)
-    if cls is None:
-        return {}
-
-    fields = {}
-    for node in class_node.body:
-        if isinstance(node, ast.Assign):
-            for target in node.targets:
-                if isinstance(target, ast.Name):
-                    val = getattr(cls, target.id, None)
-                    if val is not None:
-                        fields[target.id] = val
-    return fields
+    return extract_field_values(source, class_node)
 
 
 # ---------------------------------------------------------------------------
@@ -425,7 +493,7 @@ def _pass_type_check(
                     corrections.append((old_segment, f"[{old_segment}]", node.lineno))
                     warnings.append(Diagnostic(
                         code="W001",
-                        message=f"depends_on is string, auto-wrapping in list",
+                        message="depends_on is string, auto-wrapping in list",
                         severity=Severity.WARNING,
                         line=node.lineno,
                     ))
@@ -438,7 +506,7 @@ def _pass_type_check(
                     corrections.append((old_segment, f"[{old_segment}]", node.lineno))
                     warnings.append(Diagnostic(
                         code="W002",
-                        message=f"depends_on is int, auto-wrapping in list",
+                        message="depends_on is int, auto-wrapping in list",
                         severity=Severity.WARNING,
                         line=node.lineno,
                     ))
@@ -461,6 +529,11 @@ def _pass_type_check(
                             severity=Severity.WARNING,
                             line=node.lineno,
                         ))
+                continue
+
+            # float fields accept ints (e.g. confidence = 1)
+            if expected is float and isinstance(actual_value, (int, float)) \
+                    and not isinstance(actual_value, bool):
                 continue
 
             # Hard error: type mismatch that can't be auto-corrected
@@ -486,36 +559,41 @@ def _pass_type_check(
 
 
 # ---------------------------------------------------------------------------
-# Pass 6: Execute
+# Pass 6: Materialize (AST-only; replaces the former exec-based pass)
 # ---------------------------------------------------------------------------
 
-def _pass_execute(
+def _pass_materialize(
     source: str,
     class_name: str,
     module_type: ModuleType,
     errors: list[Diagnostic],
+    advice: list[Diagnostic],
 ) -> dict | None:
-    """Execute source in sandbox, verify methods are callable."""
-    namespace: dict = {}
-    try:
-        exec(source, namespace)
-    except ImportError:
-        # External dependencies not available — acceptable, don't fail
-        # But we can't do method checks
-        return namespace
-    except Exception as e:
+    """Build the class from its AST — module code is never executed."""
+    from stato.core.astload import materialize
+
+    result = materialize(source)
+    if result.namespace is None:
         errors.append(Diagnostic(
             code="E005",
-            message=f"Runtime execution error: {type(e).__name__}: {e}",
+            message=f"Could not materialize module: {result.error}",
             severity=Severity.ERROR,
         ))
         return None
 
-    cls = namespace.get(class_name)
-    if cls is None:
-        return namespace
+    for skipped in result.skipped_fields:
+        advice.append(Diagnostic(
+            code="I007",
+            message=f"Field '{skipped}' has a non-literal value — stored as-is "
+                    "but not statically checkable (stato never executes module code)",
+            severity=Severity.INFO,
+        ))
 
-    # Check required methods are callable
+    cls = result.namespace.get(class_name)
+    if cls is None:
+        return result.namespace
+
+    # Check required methods are present and callable
     schema = MODULE_SCHEMAS.get(module_type)
     if schema:
         for method_name in schema.get("required_methods", []):
@@ -527,7 +605,7 @@ def _pass_execute(
                     severity=Severity.ERROR,
                 ))
 
-    return namespace
+    return result.namespace
 
 
 # ---------------------------------------------------------------------------
@@ -628,6 +706,23 @@ def _validate_plan_semantics(
                 severity=Severity.ERROR,
             ))
 
+    # skills_used on steps must be a list of strings
+    for step in steps:
+        if not isinstance(step, dict):
+            continue
+        skills_used = step.get("skills_used")
+        if skills_used is None:
+            continue
+        if not isinstance(skills_used, list) or not all(
+            isinstance(s, str) for s in skills_used
+        ):
+            errors.append(Diagnostic(
+                code="E012",
+                message=f"Step {step.get('id')}: skills_used must be a list of "
+                        "skill names (strings)",
+                severity=Severity.ERROR,
+            ))
+
     # I004: no decision_log
     if not hasattr(cls, "decision_log") or not getattr(cls, "decision_log", None):
         advice.append(Diagnostic(
@@ -638,13 +733,36 @@ def _validate_plan_semantics(
 
 
 def _validate_skill_semantics(cls: type, advice: list[Diagnostic]) -> None:
-    # I003: No lessons_learned
-    if not hasattr(cls, "lessons_learned") or not getattr(cls, "lessons_learned", None):
+    # I003: No lessons_learned (structured `lessons` also counts)
+    if not getattr(cls, "lessons_learned", None) and not getattr(cls, "lessons", None):
         advice.append(Diagnostic(
             code="I003",
             message="No lessons_learned on skill",
             severity=Severity.INFO,
         ))
+
+    # I008: structured lessons entries should carry a recommendation
+    lessons = getattr(cls, "lessons", None)
+    if isinstance(lessons, list):
+        for i, entry in enumerate(lessons):
+            if not isinstance(entry, dict) or "recommendation" not in entry:
+                advice.append(Diagnostic(
+                    code="I008",
+                    message=f"lessons[{i}] should be a dict with at least a "
+                            "'recommendation' key (optional: condition, "
+                            "confidence, review_by)",
+                    severity=Severity.INFO,
+                ))
+
+    # confidence should be within 0..1
+    confidence = getattr(cls, "confidence", None)
+    if isinstance(confidence, (int, float)) and not isinstance(confidence, bool):
+        if not 0 <= confidence <= 1:
+            advice.append(Diagnostic(
+                code="I008",
+                message=f"confidence should be between 0 and 1 (got {confidence})",
+                severity=Severity.INFO,
+            ))
 
     # I006: run() has no type hints
     run_method = getattr(cls, "run", None)

@@ -1,30 +1,19 @@
 """Resume — structured recap of project state for context restoration."""
 from __future__ import annotations
 
-import ast
 from pathlib import Path
+
+from stato.core.astload import load_class
 
 
 def load_module_if_exists(path: Path):
-    """Read a .py file, exec it, return the first class or None."""
+    """Read a .py file and return its first class, built via AST (never executed)."""
     if not path.exists():
         return None
     source = path.read_text()
     if not source.strip():
         return None
-    try:
-        tree = ast.parse(source)
-    except SyntaxError:
-        return None
-    namespace = {}
-    try:
-        exec(source, namespace)
-    except Exception:
-        return None
-    for node in tree.body:
-        if isinstance(node, ast.ClassDef):
-            return namespace.get(node.name)
-    return None
+    return load_class(source)
 
 
 def generate_resume(stato_dir: Path, brief: bool = False) -> str:
@@ -128,6 +117,15 @@ def generate_resume(stato_dir: Path, brief: bool = False) -> str:
     # 4. Memory state
     memory = load_module_if_exists(stato_dir / "memory.py")
     if memory:
+        as_of = (
+            getattr(memory, "updated_at", None)
+            or getattr(memory, "last_updated", None)
+        )
+        if as_of:
+            sections.append(f"\nState as of: {as_of}")
+        source_note = getattr(memory, "source", None)
+        if source_note:
+            sections.append(f"Source: {source_note}")
         sections.append(f"\nCurrent phase: {memory.phase}")
         if hasattr(memory, "known_issues") and memory.known_issues:
             sections.append("Known issues:")
