@@ -13,7 +13,7 @@ console = Console()
 
 COMMAND_SECTIONS = [
     ("State", ["init", "validate", "audit", "status", "resume", "crystallize",
-               "find", "config"]),
+               "find", "config", "doctor", "migrate-lessons"]),
     ("Composition", ["snapshot", "import", "import-bundle", "inspect", "slice",
                      "graft", "diff", "merge", "convert"]),
     ("Bridges & Hooks", ["bridge", "hooks", "mcp", "crystallize-transcript"]),
@@ -108,10 +108,12 @@ def _write_mcp_json(project_dir: Path) -> bool:
 
 @main.command("validate")
 @click.argument("target", type=click.Path(exists=True))
-@click.option("--strict", is_flag=True, help="Treat warnings and advice as errors")
+@click.option("--strict", is_flag=True, help="Promote auto-correction warnings to errors")
 @click.option("--suppress", multiple=True, help="Diagnostic codes to hide (repeatable)")
+@click.option("--error-code", "error_codes", multiple=True,
+              help="Promote a specific code to an error (repeatable, e.g. -I006)")
 @click.option("--json", "as_json", is_flag=True, help="Machine-readable JSON output")
-def validate_cmd(target, strict, suppress, as_json):
+def validate_cmd(target, strict, suppress, error_codes, as_json):
     """Validate module(s). TARGET is a file or directory."""
     from stato.core.compiler import validate as compiler_validate
     from stato.core.config import load_config
@@ -120,6 +122,7 @@ def validate_cmd(target, strict, suppress, as_json):
     cfg = load_config(Path.cwd())
     strict = strict or cfg.validate_strict
     suppress_codes = list(suppress) + cfg.validate_suppress
+    promote_codes = list(error_codes) + cfg.validate_error_codes
 
     if target_path.is_file():
         files = [target_path]
@@ -138,7 +141,8 @@ def validate_cmd(target, strict, suppress, as_json):
     json_files = []
     for f in files:
         source = f.read_text()
-        result = compiler_validate(source, strict=strict, suppress=suppress_codes)
+        result = compiler_validate(source, strict=strict, suppress=suppress_codes,
+                                   error_codes=promote_codes)
         if as_json:
             json_files.append({
                 "file": str(f),
@@ -188,7 +192,8 @@ def status(as_json, path):
     modules = _discover_modules(as_dir)
 
     if as_json:
-        payload = {"modules": [], "plans": []}
+        from stato import __version__ as _v
+        payload = {"stato_version": _v, "modules": [], "plans": []}
         for mod in modules:
             cls = (
                 mod["namespace"].get(mod["class_name"])
@@ -218,6 +223,9 @@ def status(as_json, path):
     if not modules:
         console.print("[yellow]No modules found in .stato/[/yellow]")
         return
+
+    from stato import __version__ as _v
+    console.print(f"[dim]Stato: {_v}[/dim]")
 
     table = Table(title="Stato Modules")
     table.add_column("Module", style="cyan")
@@ -969,13 +977,17 @@ main.add_command(team)
               help="Output format(s). Repeatable. Default: claude.")
 @click.option("--force", is_flag=True, help="Overwrite hand-written agent files too")
 @click.option("--dry-run", is_flag=True, help="Show what would be written")
+@click.option("--inline", is_flag=True,
+              help="Embed full skill source (default: lessons index + pull-on-demand)")
 @click.option("--path", default=".", type=click.Path(), help="Project directory")
-def team_assemble(team_toml, formats, force, dry_run, path):
+def team_assemble(team_toml, formats, force, dry_run, inline, path):
     """Generate one subagent per role, each scoped to its skills.
 
-    Reads .stato/team.toml (or the given TEAM_TOML), slices each role's skills,
-    and writes subagent files. Handoffs render as prose; the orchestrating agent
-    still decides who runs when.
+    By default each subagent carries a lessons INDEX per skill and pulls the
+    exact lesson it needs on demand (progressive disclosure — keeps subagents
+    light). Use --inline to embed full skill source for environments without
+    the stato MCP server. Handoffs render as prose; the orchestrator decides
+    who runs when.
     """
     from stato.team import ALL_FORMATS, TeamSpecError, assemble
 
@@ -986,7 +998,7 @@ def team_assemble(team_toml, formats, force, dry_run, path):
     try:
         results = assemble(
             project_dir, team_path=team_path, formats=fmts,
-            force=force, dry_run=dry_run,
+            force=force, dry_run=dry_run, inline=inline,
         )
     except TeamSpecError as e:
         console.print(f"[red]{e}[/red]")
@@ -1721,6 +1733,53 @@ def find_cmd(query, as_json, path):
 
 
 # ---------------------------------------------------------------------------
+# migrate-lessons — prose lessons_learned -> structured lessons
+# ---------------------------------------------------------------------------
+
+@main.command("migrate-lessons")
+@click.argument("target", type=click.Path(exists=True))
+@click.option("--dry-run", is_flag=True, help="Show which modules would change")
+def migrate_lessons_cmd(target, dry_run):
+    """Convert prose lessons_learned bullets into structured `lessons` entries.
+
+    Structured lessons are individually addressable, which unlocks precise
+    progressive disclosure (pull one lesson via MCP). Non-destructive: keeps
+    the prose field. TARGET is a skill file or a .stato/ directory.
+    """
+    from stato.core.edits import migrate_lessons
+    from stato.core.state_manager import StateManager
+
+    target_path = Path(target).resolve()
+    if target_path.is_file():
+        files = [target_path]
+        project_dir = target_path.parent.parent.parent  # skills/x.py -> project
+    else:
+        files = sorted(target_path.rglob("skills/*.py"))
+        project_dir = target_path.parent
+
+    changed = 0
+    for f in files:
+        if f.name.startswith("__"):
+            continue
+        src = f.read_text()
+        new = migrate_lessons(src)
+        if new != src:
+            changed += 1
+            if dry_run:
+                console.print(f"  would migrate {f.name}")
+            else:
+                sm = StateManager(project_dir)
+                rel = str(f.relative_to(project_dir / ".stato"))
+                result = sm.write(rel, new)
+                mark = "[green]migrated[/green]" if result.success else "[red]failed[/red]"
+                console.print(f"  {mark} {f.name}")
+    if changed == 0:
+        console.print("[yellow]Nothing to migrate (no prose lessons found).[/yellow]")
+    elif not dry_run:
+        console.print(f"[green]Migrated {changed} skill(s).[/green]")
+
+
+# ---------------------------------------------------------------------------
 # Audit command — quality scoring
 # ---------------------------------------------------------------------------
 
@@ -1775,6 +1834,69 @@ def audit_cmd(target, as_json, min_score):
                     f"\n[red]{len(below)} module(s) below --min {min_score}[/red]"
                 )
             raise SystemExit(1)
+
+
+# ---------------------------------------------------------------------------
+# Doctor — environment sanity check
+# ---------------------------------------------------------------------------
+
+@main.command("doctor")
+@click.option("--json", "as_json", is_flag=True, help="Machine-readable JSON output")
+@click.option("--path", default=".", type=click.Path(), help="Project directory")
+def doctor_cmd(as_json, path):
+    """Report the stato environment: binary path, version, project state, hooks.
+
+    Useful when `stato` runs from a conda/venv bin/ that isn't on the default
+    PATH — this shows exactly which stato is answering.
+    """
+    import shutil
+    import sys
+
+    from stato import __version__
+    from stato.hooks.installers import status as hook_status
+
+    project_dir = Path(path).resolve()
+    stato_dir = project_dir / ".stato"
+    resolved = shutil.which("stato") or sys.argv[0]
+
+    info = {
+        "version": __version__,
+        "resolved_binary": resolved,
+        "python": sys.executable,
+        "project_dir": str(project_dir),
+        "stato_dir_present": stato_dir.exists(),
+        "modules": 0,
+        "hooks": {},
+        "mcp_available": False,
+    }
+    if stato_dir.exists():
+        from stato.core.composer import _discover_modules
+        info["modules"] = len(_discover_modules(stato_dir))
+        info["hooks"] = hook_status(project_dir)
+    try:
+        import mcp  # noqa: F401
+        info["mcp_available"] = True
+    except ImportError:
+        pass
+
+    if as_json:
+        _echo_json(info)
+        return
+
+    console.print(f"[bold]stato {info['version']}[/bold]")
+    console.print(f"  binary:  {info['resolved_binary']}")
+    console.print(f"  python:  {info['python']}")
+    console.print(f"  project: {info['project_dir']}")
+    if info["stato_dir_present"]:
+        console.print(f"  .stato/: [green]present[/green] ({info['modules']} modules)")
+        hooks = ", ".join(k for k, v in info["hooks"].items() if v) or "none"
+        console.print(f"  hooks:   {hooks}")
+    else:
+        console.print("  .stato/: [yellow]not initialized[/yellow] (run stato init)")
+    console.print(f"  mcp:     {'available' if info['mcp_available'] else 'not installed'}")
+    console.print("\n[dim]Tip: stato installs a console-script into the active "
+                  "environment's bin/. If `stato` isn't found, activate that env "
+                  "or use the full path above.[/dim]")
 
 
 # ---------------------------------------------------------------------------

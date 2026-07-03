@@ -14,7 +14,29 @@ names) are skipped and reported, never evaluated.
 from __future__ import annotations
 
 import ast
+import warnings
 from dataclasses import dataclass, field
+
+
+def safe_parse(source: str) -> ast.Module:
+    """ast.parse that suppresses SyntaxWarning (raises SyntaxError as usual).
+
+    A stray `\\d` in a non-raw user docstring makes ast.parse emit a
+    SyntaxWarning that would otherwise pollute all CLI output. Every parse of
+    user module source should go through here.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", SyntaxWarning)
+        return ast.parse(source)
+
+
+def parse_collecting_warnings(source: str) -> tuple[ast.Module, list[str]]:
+    """Parse and return (tree, [SyntaxWarning messages]) for authoring lints."""
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", SyntaxWarning)
+        tree = ast.parse(source)
+    msgs = [str(w.message) for w in caught if issubclass(w.category, SyntaxWarning)]
+    return tree, msgs
 
 
 @dataclass
@@ -59,7 +81,7 @@ def materialize(source: str, class_node: ast.ClassDef | None = None) -> Material
     """
     if class_node is None:
         try:
-            tree = ast.parse(source)
+            tree = safe_parse(source)
         except SyntaxError as e:
             return MaterializeResult(namespace=None, error=f"syntax error: {e.msg}")
         class_node = next(

@@ -240,11 +240,15 @@ def status(project_dir: Path) -> dict:
     for platform, rel in PLATFORM_HOOK_FILES.items():
         path = project_dir / rel
         data = _load_json(path)
-        hooks = data.get("hooks", data)  # codex is a bare hooks object
-        installed = any(
-            _is_stato_entry(e)
-            for entries in (hooks.values() if isinstance(hooks, dict) else [])
-            for e in entries
-        )
+        # codex is a bare hooks object; claude/gemini nest under "hooks".
+        hooks = data if platform == "codex" else data.get("hooks", {})
+        installed = False
+        if isinstance(hooks, dict):
+            for entries in hooks.values():
+                if isinstance(entries, list) and any(
+                    isinstance(e, dict) and _is_stato_entry(e) for e in entries
+                ):
+                    installed = True
+                    break
         result[platform] = installed
     return result

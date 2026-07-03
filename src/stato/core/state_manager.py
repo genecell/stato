@@ -110,7 +110,11 @@ class StateManager:
         if history_keep is None:
             from stato.core.config import load_config
 
-            history_keep = load_config(project_dir).history_keep
+            cfg = load_config(project_dir)
+            history_keep = cfg.history_keep
+            self.auto_stamp = cfg.state_auto_stamp
+        else:
+            self.auto_stamp = False
         self.history_keep = history_keep
 
         if backend == "auto":
@@ -118,11 +122,25 @@ class StateManager:
         else:
             self.backend = backend
 
-    def write(self, rel_path: str, source: str) -> ValidationResult:
-        """Validate → lock → backup → atomic write if valid. Returns ValidationResult."""
+    def write(self, rel_path: str, source: str, stamp: bool | None = None) -> ValidationResult:
+        """Validate → lock → backup → atomic write if valid. Returns ValidationResult.
+
+        When auto-stamp is enabled (config [state] auto_stamp, or stamp=True),
+        `updated_at` is set to today on write so freshness tracking doesn't
+        depend on humans remembering. Off by default to avoid diff churn.
+        """
         result = validate(source)
         if not result.success:
             return result
+
+        write_source = result.corrected_source or source
+
+        do_stamp = self.auto_stamp if stamp is None else stamp
+        if do_stamp:
+            from datetime import date
+
+            from stato.core.edits import stamp_updated_at
+            write_source = stamp_updated_at(write_source, date.today().isoformat())
 
         target = self.stato_dir / rel_path
 
@@ -131,8 +149,6 @@ class StateManager:
             if target.exists() and self.backend != "none":
                 self._backup(rel_path, target)
 
-            # Write corrected source if auto-corrections were applied
-            write_source = result.corrected_source or source
             _atomic_write_text(target, write_source)
 
         return result

@@ -16,12 +16,52 @@ def load_module_if_exists(path: Path):
     return load_class(source)
 
 
+def _version_lines(context, stato_dir: Path) -> list[str]:
+    """Running-version header + mismatch warning + freshness from mtime."""
+    from stato import __version__
+
+    lines = [f"Stato: {__version__}"]
+
+    # Version mismatch: compare running version to any stato version baked in
+    # context.environment (their stale-0.5.0 case).
+    if context is not None:
+        env = getattr(context, "environment", None) or {}
+        recorded = env.get("stato") or env.get("stato_version")
+        if recorded and str(recorded).lstrip(">=~ ") not in __version__ \
+                and __version__ not in str(recorded):
+            lines.append(
+                f"⚠ version mismatch: state recorded under stato {recorded}, "
+                f"running {__version__} — behavior/fields may differ."
+            )
+
+    # Freshness from filesystem mtime (survives even without updated_at fields).
+    mods = [p for p in stato_dir.rglob("*.py")
+            if ".history" not in p.parts and not p.name.startswith("__")]
+    if mods:
+        import time
+        from datetime import datetime, timezone
+        newest = max(p.stat().st_mtime for p in mods)
+        stamp = datetime.fromtimestamp(newest, tz=timezone.utc).date().isoformat()
+        age_days = int((time.time() - newest) / 86400)
+        if age_days >= 14:
+            lines.append(
+                f"⚠ State files last modified {stamp} ({age_days} days ago) — "
+                "may be stale; verify against current work before anchoring to it."
+            )
+        else:
+            lines.append(f"State files last modified: {stamp}")
+    return lines
+
+
 def generate_resume(stato_dir: Path, brief: bool = False) -> str:
     """Read all modules and produce a structured recap."""
     sections = []
 
     # 1. Context (project name, description)
     context = load_module_if_exists(stato_dir / "context.py")
+
+    sections.extend(_version_lines(context, stato_dir))
+
     if context:
         sections.append(f"Project: {context.project}")
         sections.append(f"Description: {context.description}")
@@ -136,9 +176,10 @@ def generate_resume(stato_dir: Path, brief: bool = False) -> str:
                 f"\nReflection:\n{memory.reflection.strip()}"
             )
 
-    # 5. Brief mode: compress to one paragraph
+    # 5. Brief mode: compress to one paragraph (keep version/freshness header)
     if brief:
-        return generate_brief(context, plan, memory)
+        header = "\n".join(_version_lines(context, stato_dir))
+        return header + "\n" + generate_brief(context, plan, memory)
 
     return "\n".join(sections)
 

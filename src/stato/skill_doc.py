@@ -96,6 +96,11 @@ Declare a type explicitly with `__stato_type__ = "skill"` if inference is unsure
 - Read plan/skills before acting; validate after writing; keep `.stato/` current.
 - Prefer editing the smallest module that changed; re-run `stato validate`.
 - Capture the WHY (lessons, decisions), not just the WHAT.
+
+## Environment note
+Stato installs a console-script into the **active environment's `bin/`** (e.g.
+a conda/venv). If `stato` isn't found, activate that environment or use the full
+path. Run `stato doctor` to see the resolved binary, version, and project state.
 """
 
 

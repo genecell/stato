@@ -147,3 +147,35 @@ class QC:
 '''
     result = validate(source, expected_type="skill")
     assert result.success
+
+
+# --- SyntaxWarning suppression + I009 lint (0.8.1) ---
+
+def test_safe_parse_suppresses_syntax_warning(recwarn):
+    from stato.core.astload import safe_parse
+    safe_parse('class Q:\n    """match \\d+"""\n    name="q"\n')
+    assert not [w for w in recwarn.list if issubclass(w.category, SyntaxWarning)]
+
+
+def test_validate_no_syntaxwarning_leak(recwarn):
+    from stato.core.compiler import validate
+    validate('class Q:\n    """has \\d escape"""\n    name="q"\n    def run(self): pass\n',
+             expected_type="skill")
+    assert not [w for w in recwarn.list if issubclass(w.category, SyntaxWarning)]
+
+
+def test_i009_flags_invalid_escape():
+    from stato.core.compiler import validate
+    result = validate(
+        'class Q:\n    """match \\d+ digits"""\n    name="q"\n    def run(self): pass\n',
+        expected_type="skill")
+    assert result.success  # not an error, just advice
+    assert any(d.code == "I009" for d in result.advice)
+
+
+def test_i009_absent_for_raw_string():
+    from stato.core.compiler import validate
+    result = validate(
+        'class Q:\n    r"""match \\d+ digits"""\n    name="q"\n    def run(self): pass\n',
+        expected_type="skill")
+    assert not any(d.code == "I009" for d in result.advice)

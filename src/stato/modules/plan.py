@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import ast
 
+from stato.core.astload import safe_parse
 from stato.core.module import Diagnostic
 
 ALLOWED_STATUSES = {"pending", "running", "complete", "failed", "blocked"}
@@ -55,7 +56,7 @@ def reset_plan_for_template(source: str) -> str:
     Uses AST parse + modify + ast.unparse() for reliability.
     """
     try:
-        tree = ast.parse(source)
+        tree = safe_parse(source)
     except SyntaxError:
         return source
 

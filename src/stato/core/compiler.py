@@ -11,6 +11,7 @@ import ast
 import re
 import textwrap
 
+from stato.core.astload import safe_parse
 from stato.core.module import (
     MODULE_SCHEMAS,
     Diagnostic,
@@ -29,14 +30,20 @@ def validate(
     expected_type: str | None = None,
     strict: bool = False,
     suppress: list[str] | None = None,
+    error_codes: list[str] | None = None,
 ) -> ValidationResult:
     """Run the 7-pass validation pipeline on Python source code.
 
-    strict: treat auto-corrections and advice as hard errors.
+    strict: promote auto-correction WARNINGS to hard errors (advice/info stays
+        advisory — style lints shouldn't fail a correctness gate).
     suppress: diagnostic codes (e.g. ["I006"]) to drop from the result.
+    error_codes: specific codes to promote to hard errors (granular strictness),
+        e.g. ["I006"] to require type hints without promoting everything.
     """
     result = _validate_inner(source, expected_type)
-    return _apply_policy(result, strict=strict, suppress=suppress or [])
+    return _apply_policy(
+        result, strict=strict, suppress=suppress or [], error_codes=error_codes or [],
+    )
 
 
 def _validate_inner(source: str, expected_type: str | None = None) -> ValidationResult:
@@ -45,7 +52,7 @@ def _validate_inner(source: str, expected_type: str | None = None) -> Validation
     advice: list[Diagnostic] = []
 
     # Pass 1: Syntax
-    tree = _pass_syntax(source, errors)
+    tree = _pass_syntax(source, errors, advice)
     if tree is None:
         return _build_result(errors, warnings, advice, success=False)
 
@@ -115,7 +122,7 @@ def _validate_inner(source: str, expected_type: str | None = None) -> Validation
 def decompile(source: str) -> str:
     """Convert Python module source to readable markdown."""
     try:
-        tree = ast.parse(source)
+        tree = safe_parse(source)
     except SyntaxError:
         return f"# Invalid Module\n\nSource has syntax errors.\n\n## Source\n\n```python\n{source}\n```\n"
 
@@ -214,8 +221,10 @@ def compile_from_markdown(markdown: str) -> tuple[str, ValidationResult]:
 # ---------------------------------------------------------------------------
 
 def _apply_policy(
-    result: ValidationResult, strict: bool, suppress: list[str]
+    result: ValidationResult, strict: bool, suppress: list[str],
+    error_codes: list[str] | None = None,
 ) -> ValidationResult:
+    error_codes = error_codes or []
     if suppress:
         keep = lambda d: d.code not in suppress  # noqa: E731
         result.hard_errors = [d for d in result.hard_errors if keep(d)]
@@ -224,11 +233,20 @@ def _apply_policy(
         if not result.hard_errors and not result.success and result.namespace is not None:
             result.success = True
 
-    if strict and (result.auto_corrections or result.advice):
-        result.hard_errors.extend(result.auto_corrections)
-        result.hard_errors.extend(result.advice)
+    # --strict promotes WARNINGS (auto-corrections) only; advice/info stays
+    # advisory. error_codes promotes specific codes regardless of tier.
+    promoted = []
+    if strict:
+        promoted.extend(result.auto_corrections)
         result.auto_corrections = []
-        result.advice = []
+    if error_codes:
+        for bucket_name in ("auto_corrections", "advice"):
+            bucket = getattr(result, bucket_name)
+            promoted.extend([d for d in bucket if d.code in error_codes])
+            setattr(result, bucket_name, [d for d in bucket if d.code not in error_codes])
+
+    if promoted:
+        result.hard_errors.extend(promoted)
         result.success = False
 
     return result
@@ -276,9 +294,13 @@ def _extract_declared_type(
 # Pass 1: Syntax
 # ---------------------------------------------------------------------------
 
-def _pass_syntax(source: str, errors: list[Diagnostic]) -> ast.Module | None:
+def _pass_syntax(
+    source: str, errors: list[Diagnostic], advice: list[Diagnostic] | None = None
+) -> ast.Module | None:
+    from stato.core.astload import parse_collecting_warnings
+
     try:
-        return ast.parse(source)
+        tree, warn_msgs = parse_collecting_warnings(source)
     except SyntaxError as e:
         errors.append(Diagnostic(
             code="E001",
@@ -287,6 +309,17 @@ def _pass_syntax(source: str, errors: list[Diagnostic]) -> ast.Module | None:
             line=e.lineno,
         ))
         return None
+
+    # I009: authoring lint — invalid escape sequence in a non-raw string.
+    if advice is not None:
+        for msg in warn_msgs:
+            if "escape sequence" in msg:
+                advice.append(Diagnostic(
+                    code="I009",
+                    message=f"{msg} — use a raw string (r\"...\") to avoid the warning",
+                    severity=Severity.INFO,
+                ))
+    return tree
 
 
 # ---------------------------------------------------------------------------

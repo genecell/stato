@@ -2,6 +2,61 @@
 
 All notable changes to Stato are documented here.
 
+## [0.9.0] - 2026-07-03
+
+Progressive disclosure — subagents that scale. 323 tests pass.
+
+### Added — progressive disclosure
+- **`core/summarize.py`**: a compact projection of a module — docstring, method
+  signatures, params, tags, and a **lessons index** (one line per lesson).
+  Because stato modules are AST-parseable, retrieval is precise (pull lesson N),
+  not fuzzy — no embeddings.
+- **`team assemble` now emits the lessons index + pull-on-demand by default**,
+  so a subagent stays light instead of carrying whole skills. `--inline`
+  embeds full skill source for environments without the MCP server. (Index size
+  is roughly constant, so the token saving scales with skill size — ~45% on
+  small skills, far more on large ones.)
+- **MCP**: resource `stato://skills/{name}/summary` + tool
+  `stato_get_skill_section(skill, id)` — a subagent reads the index and pulls
+  the exact lesson **live** from the server (drift-free, precise).
+- **`stato migrate-lessons`**: convert prose `lessons_learned` bullets into
+  structured `lessons` entries (non-destructive), making each lesson
+  individually addressable for precise pull.
+
+### Changed
+- `resume` warns when state files are ≥14 days old (staleness caveat, so an
+  auto-restore doesn't confidently re-anchor to stale state).
+- Reminder hook gains `[hooks] reminder_min_interval` — won't re-fire within N
+  minutes even as steps accrue.
+
+## [0.8.1] - 2026-07-03
+
+Polish patch from real-project field feedback. 312 tests pass.
+
+### Fixed
+- **SyntaxWarning no longer pollutes output.** A stray `\d` in a non-raw user
+  docstring made `ast.parse` emit a `SyntaxWarning` that leaked into
+  `status`/`audit`/`resume`. All user-source parsing now routes through one
+  `safe_parse` chokepoint that suppresses it.
+- `hooks status` crashed on a `.claude/settings.json` that had no `hooks` key.
+
+### Changed
+- **`--strict` now promotes warnings only**, not advice/info — an existing
+  project can adopt `--strict` without a type-hint sweep (I006 no longer fails
+  every skill). New `--error-code` / `[validate] error_codes` promotes specific
+  codes for granular strictness.
+- `resume`/`status` show the running **Stato version**; `resume` warns on a
+  **version mismatch** vs `context.environment` and shows filesystem-mtime
+  freshness ("State files last modified").
+
+### Added
+- **`stato doctor`**: resolved binary path, version, `.stato/` presence, hooks
+  status, MCP availability — and the PATH/env tip for conda/venv installs.
+- **I009 authoring lint**: flags an invalid escape sequence in a non-raw string
+  (suggests a raw string) at validation time.
+- **Opt-in auto-stamp**: `[state] auto_stamp` (or `StateManager.write(stamp=)`)
+  sets `updated_at` on write. Off by default to avoid diff churn.
+
 ## [0.8.0] - 2026-07-02
 
 Make stato self-teaching to coding agents. 294 Tier 1 tests pass.

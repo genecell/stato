@@ -174,14 +174,34 @@ def _skill_table(skills: list[dict]) -> list[str]:
     return lines
 
 
-def _agent_body(team: TeamSpec, agent: AgentSpec, skills: list[dict]) -> str:
+def _agent_body(team: TeamSpec, agent: AgentSpec, skills: list[dict],
+                inline: bool = False) -> str:
+    from stato.core.summarize import render_summary, summarize_module
+
     team_name = team.name or "this project"
     lines = [f"You are the **{agent.role}** on the {team_name} team."]
     if agent.description:
         lines += ["", agent.description]
     lines += ["", "## Your expertise", ""]
     lines += _skill_table(skills)
-    lines += ["", "Read `.stato/skills/<name>.py` for full details before performing that task."]
+    lines += [""]
+    if inline:
+        # Full skill source inlined (for environments without the stato MCP server).
+        for s in skills:
+            src = s["full_path"].read_text() if s.get("full_path") else ""
+            lines += [f"### {s['rel_path']}", "```python", src.rstrip(), "```", ""]
+    else:
+        # Default: lessons INDEX per skill + pull-on-demand (progressive
+        # disclosure). Keeps the subagent light; it pulls the exact lesson it
+        # needs via the stato MCP server (stato_get_skill_section) or by reading
+        # the specific section of .stato/skills/<name>.py.
+        for s in skills:
+            summary = summarize_module(s["full_path"].read_text()) if s.get("full_path") else None
+            if summary is not None:
+                lines += [render_summary(summary), ""]
+        lines += ["Pull a lesson's full text on demand via the stato MCP tool "
+                  "`stato_get_skill_section(skill, id)`, or read that section of "
+                  "`.stato/skills/<name>.py`. Don't load whole skills up front."]
     if agent.handoff:
         lines += ["", "## Handoff", "", agent.handoff]
     lines += [
@@ -193,7 +213,7 @@ def _agent_body(team: TeamSpec, agent: AgentSpec, skills: list[dict]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def render_claude_agent(team: TeamSpec, agent: AgentSpec, skills: list[dict]) -> str:
+def render_claude_agent(team: TeamSpec, agent: AgentSpec, skills: list[dict], inline: bool = False) -> str:
     """Claude Code subagent: .claude/agents/<role>.md.
 
     Format: YAML frontmatter (name/description/model/tools) + markdown body.
@@ -208,11 +228,11 @@ def render_claude_agent(team: TeamSpec, agent: AgentSpec, skills: list[dict]) ->
     return (
         "\n".join(lines)
         + f"\n<!-- {TEAM_MARKER}. Regenerate: stato team assemble -->\n\n"
-        + _agent_body(team, agent, skills)
+        + _agent_body(team, agent, skills, inline)
     )
 
 
-def render_gemini_agent(team: TeamSpec, agent: AgentSpec, skills: list[dict]) -> str:
+def render_gemini_agent(team: TeamSpec, agent: AgentSpec, skills: list[dict], inline: bool = False) -> str:
     """Gemini CLI subagent: .gemini/agents/<role>.md.
 
     Format: YAML frontmatter + markdown body (system prompt), like Claude's.
@@ -228,11 +248,11 @@ def render_gemini_agent(team: TeamSpec, agent: AgentSpec, skills: list[dict]) ->
     return (
         "\n".join(lines)
         + f"\n<!-- {TEAM_MARKER}. Regenerate: stato team assemble -->\n\n"
-        + _agent_body(team, agent, skills)
+        + _agent_body(team, agent, skills, inline)
     )
 
 
-def render_codex_agent(team: TeamSpec, agent: AgentSpec, skills: list[dict]) -> str:
+def render_codex_agent(team: TeamSpec, agent: AgentSpec, skills: list[dict], inline: bool = False) -> str:
     """Codex CLI subagent: .codex/agents/<role>.toml.
 
     Format verified vs Codex docs: TOML with name/description/
@@ -244,7 +264,7 @@ def render_codex_agent(team: TeamSpec, agent: AgentSpec, skills: list[dict]) -> 
     config: dict = {
         "name": agent.role,
         "description": agent.description,
-        "developer_instructions": _agent_body(team, agent, skills),
+        "developer_instructions": _agent_body(team, agent, skills, inline),
     }
     if agent.model:
         config["model"] = agent.model
@@ -254,12 +274,12 @@ def render_codex_agent(team: TeamSpec, agent: AgentSpec, skills: list[dict]) -> 
     )
 
 
-def render_sdk_agent(team: TeamSpec, agent: AgentSpec, skills: list[dict]) -> str:
+def render_sdk_agent(team: TeamSpec, agent: AgentSpec, skills: list[dict], inline: bool = False) -> str:
     """Claude Agent SDK agent config (JSON)."""
     config = {
         "name": agent.role,
         "description": agent.description,
-        "prompt": _agent_body(team, agent, skills),
+        "prompt": _agent_body(team, agent, skills, inline),
         "_generated_by": TEAM_MARKER,
     }
     if agent.model:
@@ -301,6 +321,7 @@ def assemble(
     formats: list[str] | None = None,
     force: bool = False,
     dry_run: bool = False,
+    inline: bool = False,
 ) -> list[tuple[Path, str]]:
     """Generate subagent files for every role. Returns [(path, action), ...].
 
@@ -320,7 +341,7 @@ def assemble(
         skills = resolved[agent.role]
         for fmt in formats:
             path = _output_path(project_dir, fmt, agent.role)
-            content = _RENDERERS[fmt](team, agent, skills)
+            content = _RENDERERS[fmt](team, agent, skills, inline)
             existed = path.exists()
             if existed and not force and not _is_stato_owned(path):
                 results.append((path, "skipped"))

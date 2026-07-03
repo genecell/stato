@@ -5,6 +5,8 @@ import ast
 from dataclasses import dataclass
 from pathlib import Path
 
+from stato.core.astload import safe_parse
+
 
 @dataclass
 class BundleParseResult:
@@ -30,7 +32,7 @@ def parse_bundle(bundle_path: Path) -> BundleParseResult:
     context = None
 
     try:
-        tree = ast.parse(content)
+        tree = safe_parse(content)
     except SyntaxError as e:
         return BundleParseResult({}, None, None, None, [f"Bundle syntax error: {e}"])
 

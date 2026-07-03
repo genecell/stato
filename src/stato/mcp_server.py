@@ -80,6 +80,21 @@ def build_server(project_dir: Path):
             return f"(no skill named {name})"
         return path.read_text()
 
+    @mcp.resource("stato://skills/{name}/summary")
+    def skill_summary_resource(name: str) -> str:
+        """Compact summary + lessons index for a skill (progressive disclosure).
+
+        Read this first; pull a specific lesson's full text with
+        stato_get_skill_section instead of loading the whole skill.
+        """
+        from stato.core.summarize import render_summary, summarize_module
+
+        path = stato_dir / "skills" / f"{name}.py"
+        if not path.exists():
+            return f"(no skill named {name})"
+        summary = summarize_module(path.read_text())
+        return render_summary(summary) if summary else "(could not summarize)"
+
     # --- Tools: the compiler, interactive ---------------------------------
 
     @mcp.tool()
@@ -151,6 +166,20 @@ def build_server(project_dir: Path):
         payload = _result_to_dict(result)
         payload["written"] = result.success
         return json.dumps(payload, indent=2)
+
+    @mcp.tool()
+    def stato_get_skill_section(skill: str, lesson_id: int) -> str:
+        """Pull one lesson's full text from a skill by index (progressive
+        disclosure). Read stato://skills/{skill}/summary first for the index."""
+        from stato.core.summarize import get_skill_section
+
+        path = stato_dir / "skills" / f"{skill}.py"
+        if not path.exists():
+            return json.dumps({"error": f"no skill named {skill}"})
+        section = get_skill_section(path.read_text(), lesson_id)
+        if section is None:
+            return json.dumps({"error": f"no lesson {lesson_id} in {skill}"})
+        return section
 
     @mcp.tool()
     def stato_resume(brief: bool = False) -> str:

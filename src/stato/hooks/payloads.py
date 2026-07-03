@@ -137,21 +137,34 @@ def stop_reminder(hook_input: dict | None = None, out=None) -> int:
     try:
         from stato.core.config import load_config
 
-        threshold = getattr(load_config(project_dir), "hooks_reminder_threshold", 3)
+        cfg = load_config(project_dir)
+        threshold = getattr(cfg, "hooks_reminder_threshold", 3)
+        min_interval = getattr(cfg, "hooks_reminder_min_interval", 0)
     except Exception:
-        threshold = 3
+        threshold, min_interval = 3, 0
 
     watermark_file = stato_dir / ".reminder_state.json"
-    watermark = 0
+    watermark, last_fired = 0, None
     if watermark_file.exists():
         try:
-            watermark = int(_json.loads(watermark_file.read_text()).get("completed", 0))
+            data = _json.loads(watermark_file.read_text())
+            watermark = int(data.get("completed", 0))
+            last_fired = data.get("last_fired")
         except (ValueError, OSError):
             watermark = 0
 
+    # Rate gate: don't re-fire within min_interval minutes even if steps accrue.
+    if min_interval and last_fired and not _interval_elapsed(last_fired, min_interval):
+        out.write("{}")
+        return 0
+
     if completed - watermark >= threshold:
+        from datetime import datetime, timezone
         try:
-            watermark_file.write_text(_json.dumps({"completed": completed}))
+            watermark_file.write_text(_json.dumps({
+                "completed": completed,
+                "last_fired": datetime.now(timezone.utc).isoformat(),
+            }))
         except OSError:
             pass
         out.write(_json.dumps({
@@ -165,6 +178,17 @@ def stop_reminder(hook_input: dict | None = None, out=None) -> int:
 
     out.write("{}")
     return 0
+
+
+def _interval_elapsed(last_fired_iso: str, min_interval_minutes: int) -> bool:
+    """True if at least min_interval minutes have passed since last_fired."""
+    from datetime import datetime, timezone
+    try:
+        last = datetime.fromisoformat(last_fired_iso)
+    except (ValueError, TypeError):
+        return True
+    now = datetime.now(timezone.utc)
+    return (now - last).total_seconds() >= min_interval_minutes * 60
 
 
 def _completed_step_count(plan_file: Path) -> int:

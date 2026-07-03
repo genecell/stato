@@ -1,12 +1,53 @@
 [meta]
 version = 1
-updated = "2026-02-14"
+updated = "2026-07-03"
 
 [packages.stato-self]
 description = "Stato development expertise: compiler design, composition algebra, testing strategy, cross-platform bridges"
 author = "genecell"
 url = "https://github.com/genecell/stato/raw/master/docs/registry/packages/stato-self.stato"
-version = "0.5.0"
+version = "0.8.0"
 tags = ["python", "cli", "packaging", "compiler", "testing", "composition"]
 modules = 8
-updated = "2026-02-14"
+updated = "2026-07-03"
+sha256 = "sha256:b9a20b6b4dcf3977ac6d679861d36b8c37dc611aedd989467267a643e250747c"
+
+[packages.piaso-scrna-skills-testing]
+description = "Real scRNA-seq analysis expertise from PIASO runs: COSG markers, INFOG normalization, SVD, Leiden/UMAP, viz."
+author = "genecell"
+url = "https://github.com/genecell/stato/raw/master/docs/registry/packages/piaso-scrna-skills-testing.stato"
+version = "1.0.0"
+tags = ["scrna", "cosg", "infog", "clustering", "piaso", "scanpy"]
+modules = 10
+updated = "2026-07-03"
+sha256 = "sha256:59a9ad9706d601b91b326a104211c4aad635af04aff8ee7e969cf6c5251d65ec"
+
+[packages.piaso-infog-normalization]
+description = "PIASO INFOG normalization workflow: layer management, INFOG normalize, and scanpy/sklearn fallbacks."
+author = "genecell"
+url = "https://github.com/genecell/stato/raw/master/docs/registry/packages/piaso-infog-normalization.stato"
+version = "1.0.0"
+tags = ["scrna", "normalization", "infog", "piaso", "preprocessing"]
+modules = 4
+updated = "2026-07-03"
+sha256 = "sha256:c1d1e3ef87b28c60f8725ad62b803f877c840d2a145acbf61f2cee848e996ee4"
+
+[packages.piaso-dimreduction]
+description = "PIASO dimensionality reduction & clustering: SVD reduction, neighbors, Leiden/UMAP."
+author = "genecell"
+url = "https://github.com/genecell/stato/raw/master/docs/registry/packages/piaso-dimreduction.stato"
+version = "1.0.0"
+tags = ["scrna", "dimensionality-reduction", "clustering", "leiden", "umap", "piaso"]
+modules = 4
+updated = "2026-07-03"
+sha256 = "sha256:b813d42607b69bd61aa7fee4ed250cadc3e74af0e9d549c71590190d38f1673e"
+
+[packages.piaso-markers-plus]
+description = "PIASO marker genes & cell typing: COSG markers, marker visualization, and PIASOmarkerDB cell-type inference (scaffold)."
+author = "genecell"
+url = "https://github.com/genecell/stato/raw/master/docs/registry/packages/piaso-markers-plus.stato"
+version = "1.0.0"
+tags = ["scrna", "marker-genes", "cosg", "cell-typing", "piaso"]
+modules = 4
+updated = "2026-07-03"
+sha256 = "sha256:09cf8aa4050f92fe84f19226c20afa30e8371c1c1f44278ed7e894e256cc8e90"

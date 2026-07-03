@@ -133,7 +133,26 @@ class P:
     assert any(d.code == "E012" for d in result.hard_errors)
 
 
-def test_strict_mode_turns_advice_into_errors():
+def test_strict_promotes_warnings_not_advice():
+    # version = "1.0" triggers W003 (auto-correction warning)
+    source = '''
+class QC:
+    """A skill with an advice-only gap and a warning."""
+    name = "qc"
+    version = "1.0"
+    lessons_learned = "- something"
+
+    def run(self):
+        pass
+'''
+    normal = validate(source, expected_type="skill")
+    assert normal.success
+    strict = validate(source, expected_type="skill", strict=True)
+    assert not strict.success  # W003 promoted
+
+
+def test_strict_leaves_advice_advisory():
+    # only advice (no docstring, no lessons, no type hints) — strict must NOT fail
     source = '''
 class QC:
     name = "qc"
@@ -141,11 +160,25 @@ class QC:
     def run(self):
         pass
 '''
-    normal = validate(source, expected_type="skill")
-    assert normal.success  # only advice (no docstring, no lessons)
     strict = validate(source, expected_type="skill", strict=True)
-    assert not strict.success
-    assert strict.hard_errors
+    assert strict.success  # advice/info is not a correctness failure
+    assert strict.advice
+
+
+def test_error_codes_promotes_specific_code():
+    source = '''
+class QC:
+    """Skill without type hints."""
+    name = "qc"
+    lessons_learned = "- x"
+
+    def run(self):
+        pass
+'''
+    assert validate(source, expected_type="skill").success
+    promoted = validate(source, expected_type="skill", error_codes=["I006"])
+    assert not promoted.success
+    assert any(d.code == "I006" for d in promoted.hard_errors)
 
 
 def test_suppress_hides_codes():

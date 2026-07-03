@@ -8,6 +8,8 @@ from pathlib import Path
 
 import tomli
 
+from stato.core.astload import safe_parse
+
 
 @dataclass
 class FieldDiff:
@@ -20,7 +22,7 @@ class FieldDiff:
 def _extract_class_fields(source: str) -> dict:
     """Parse a module source and return field→value dict from the first class."""
     try:
-        tree = ast.parse(source)
+        tree = safe_parse(source)
     except SyntaxError:
         return {}
 

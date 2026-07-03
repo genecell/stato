@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import ast
 
+from stato.core.astload import safe_parse
 from stato.core.module import Diagnostic
 
 
@@ -16,7 +17,7 @@ def reset_memory_for_template(source: str) -> str:
     rename reflection -> prior_reflection.
     """
     try:
-        tree = ast.parse(source)
+        tree = safe_parse(source)
     except SyntaxError:
         return source
 

@@ -36,11 +36,15 @@ CONFIG_TEMPLATE = """\
 # platforms = ["agents", "claude"]  # what `stato bridge --platform all` generates
 
 [validate]
-# strict = false            # treat warnings/advice as errors
-# suppress = ["I006"]       # diagnostic codes to hide
+# strict = false             # promote auto-correction warnings to errors
+# suppress = ["I006"]        # diagnostic codes to hide
+# error_codes = ["I006"]     # specific codes to promote to errors (granular)
 
 [history]
 # keep = 50                 # backups retained per module in .stato/.history/
+
+[state]
+# auto_stamp = false        # set updated_at on every write (freshness tracking)
 
 [hooks]
 # freshness_gate = false      # PreCompact blocks auto-compaction when state is stale
@@ -60,9 +64,12 @@ class StatoConfig:
     bridge_platforms: list[str] = field(default_factory=lambda: ["agents", "claude"])
     validate_strict: bool = False
     validate_suppress: list[str] = field(default_factory=list)
+    validate_error_codes: list[str] = field(default_factory=list)
     history_keep: int = 50
+    state_auto_stamp: bool = False
     hooks_freshness_gate: bool = False
     hooks_reminder_threshold: int = 3
+    hooks_reminder_min_interval: int = 0
     plugins_enabled: bool = False
     # provenance: key -> "default" | "user" | "project" | "env"
     sources: dict = field(default_factory=dict)
@@ -106,9 +113,12 @@ _KEYS = [
     ("bridge_platforms", "bridge", "platforms", list),
     ("validate_strict", "validate", "strict", bool),
     ("validate_suppress", "validate", "suppress", list),
+    ("validate_error_codes", "validate", "error_codes", list),
     ("history_keep", "history", "keep", int),
+    ("state_auto_stamp", "state", "auto_stamp", bool),
     ("hooks_freshness_gate", "hooks", "freshness_gate", bool),
     ("hooks_reminder_threshold", "hooks", "reminder_threshold", int),
+    ("hooks_reminder_min_interval", "hooks", "reminder_min_interval", int),
     ("plugins_enabled", "plugins", "enabled", bool),
 ]
 

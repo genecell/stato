@@ -12,6 +12,7 @@ import tomli
 import tomli_w
 
 from stato import __version__
+from stato.core.astload import safe_parse
 from stato.core.module import infer_module_type
 
 
@@ -112,7 +113,7 @@ def discover_modules(stato_dir: Path) -> dict[str, str]:
 def extract_module_fields(source: str) -> dict | None:
     """Extract class fields + inferred type via AST (module code never executed)."""
     try:
-        tree = ast.parse(source)
+        tree = safe_parse(source)
     except SyntaxError:
         return None
 
