@@ -168,6 +168,19 @@ def build_server(project_dir: Path):
         return json.dumps(payload, indent=2)
 
     @mcp.tool()
+    def stato_reflect(min_churn: int = 3) -> str:
+        """Surface dead-ends from the project's edit history as candidate lessons.
+
+        Reads .stato/.history/: a value that changed and reverted (e.g. a
+        parameter 20 -> 25 -> 20) is empirical evidence of a dead-end. Use this
+        when crystallizing to record failures you might otherwise forget — then
+        write the lesson with stato_append_lesson.
+        """
+        from stato.core.reflect import reflect
+
+        return reflect(stato_dir, min_churn=min_churn).render()
+
+    @mcp.tool()
     def stato_workspace(task: str = "", budget: int = 0) -> str:
         """Assemble the working set of skills for your current TASK.
 

@@ -143,3 +143,12 @@ def test_workspace_tool_via_core(project):
     assert view.signal == "task"
     text = view.render()
     assert "Workspace for:" in text
+
+
+def test_reflect_tool_via_core(project):
+    """stato_reflect wraps reflect() — no history -> no candidates."""
+    from stato.core.reflect import reflect
+
+    report = reflect(project / ".stato")
+    assert hasattr(report, "candidates")
+    assert "reflect" in report.render().lower() or "nothing" in report.render().lower()

@@ -13,7 +13,8 @@ console = Console()
 
 COMMAND_SECTIONS = [
     ("State", ["init", "validate", "audit", "status", "resume", "workspace",
-               "crystallize", "find", "config", "doctor", "migrate-lessons"]),
+               "reflect", "crystallize", "find", "config", "doctor",
+               "migrate-lessons"]),
     ("Composition", ["snapshot", "import", "import-bundle", "inspect", "slice",
                      "graft", "diff", "merge", "convert"]),
     ("Bridges & Hooks", ["bridge", "hooks", "mcp", "crystallize-transcript"]),
@@ -1660,6 +1661,53 @@ def crystallize(print_prompt, web, path):
                 title="[bold]Crystallize[/bold]",
                 border_style="cyan",
             ))
+
+
+# ---------------------------------------------------------------------------
+# Reflect — surface dead-ends from edit history as candidate lessons
+# ---------------------------------------------------------------------------
+
+@main.command("reflect")
+@click.option("--min-churn", type=int, default=3,
+              help="Flag a field that changed at least this many times")
+@click.option("--json", "as_json", is_flag=True, help="Machine-readable JSON output")
+@click.option("--path", default=".", type=click.Path(), help="Project directory")
+def reflect_cmd(min_churn, as_json, path):
+    """Surface reversions and churn from .stato/.history/ as candidate lessons.
+
+    Reads your own edit history: a value that changed and reverted (e.g. a
+    parameter 20 -> 25 -> 20) is a dead-end worth recording. stato shows the
+    evidence; you decide what to capture as a lesson (e.g. via append_lesson).
+    Counters the tendency to under-record failures.
+    """
+    from stato.core.reflect import reflect
+
+    project_dir = Path(path).resolve()
+    stato_dir = project_dir / ".stato"
+    if not stato_dir.exists():
+        console.print("[red]No .stato/ directory found. Run 'stato init' first.[/red]")
+        raise SystemExit(1)
+
+    report = reflect(stato_dir, min_churn=min_churn)
+    if as_json:
+        _echo_json(report.to_dict())
+        return
+
+    if not report.candidates:
+        console.print("[dim]No reversions or churn in history yet — nothing to "
+                      "reflect on.[/dim]")
+        return
+
+    console.print("[bold]Reflection — candidate lessons from your edit history[/bold]")
+    console.print("[dim](evidence only; you decide what to record)[/dim]")
+    current_mod = None
+    for c in report.candidates:
+        if c.module != current_mod:
+            current_mod = c.module
+            console.print(f"\n[cyan]{c.module}[/cyan]")
+        tag = "[yellow]reverted[/yellow]" if c.signal == "reversion" else "[dim]churned[/dim]"
+        console.print(f"  {tag} [bold]{c.field}[/bold]: {c.evidence}")
+        console.print(f"    [dim]→ {c.suggestion}[/dim]")
 
 
 # ---------------------------------------------------------------------------

@@ -4,7 +4,7 @@ description: Use stato to persist, validate, and restore an AI agent's cognitive
 license: MIT
 metadata:
   author: Stato
-  version: "0.10.0"
+  version: "0.11.0"
 ---
 
 # Using stato
@@ -23,7 +23,9 @@ directory: to restore prior context, capture what you learn, or hand work off.
    read `.stato/plan.py` for current progress.
 2. **Work** — perform the task, guided by `.stato/skills/<name>.py`.
 3. **Capture** — when you learn a parameter, decision, or lesson, update the
-   relevant module (or run the crystallize prompt: `stato crystallize`).
+   relevant module (or run the crystallize prompt: `stato crystallize`). Record
+   **failures too** ("avoid X because Y"); `stato reflect` surfaces values you
+   changed and reverted — dead-ends worth writing down.
 4. **Validate** — run `stato validate .stato/` after any change; fix errors
    before continuing. Never leave invalid state on disk.
 5. **Persist milestones** — update `.stato/plan.py` step status/output and

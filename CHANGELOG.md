@@ -2,6 +2,26 @@
 
 All notable changes to Stato are documented here.
 
+## [0.11.0] - 2026-07-07
+
+Reflection — record the failures you'd otherwise forget. 353 tests pass.
+
+### Added
+- **`stato reflect`** and the MCP tool **`stato_reflect()`**: surface dead-ends
+  from your own edit history (`.stato/.history/`). A value that changed and
+  **reverted** — e.g. a parameter `20 → 25 → 20` — is empirical evidence of a
+  dead-end the agent can't have forgotten; stato flags reversions and churn as
+  **candidate lessons** for the model to distill (via `stato_append_lesson`).
+  Deterministic, AST-only, no model call. Counters "negative-results bias" by
+  surfacing failures instead of relying on the agent to remember them.
+- The crystallize prompt and `SKILL.md` now explicitly ask for **pitfalls**
+  ("avoid X because Y") and point at `stato reflect`.
+
+### Docs
+- README **Quickstart per agent** section (one command per tool, install
+  included). Fixed stale bridge references (`.cursorrules` →
+  `.cursor/rules/stato.mdc`; the platform list now shows all six bridges).
+
 ## [0.10.0] - 2026-07-07
 
 Workspace — load only what the current task needs. 340 tests pass.

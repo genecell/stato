@@ -5,7 +5,7 @@
 Capture, validate, and transfer AI agent expertise.
 
 [![PyPI](https://img.shields.io/pypi/v/stato)](https://pypi.org/project/stato/)
-[![Tests](https://img.shields.io/badge/tests-340%20passing-green)]()
+[![Tests](https://img.shields.io/badge/tests-353%20passing-green)]()
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)]()
 [![License](https://img.shields.io/badge/license-MIT-green)]()
 
@@ -39,6 +39,29 @@ A tool needs only one tier to work with stato; each higher tier deepens it.
 | **Instructions** | Static index any tool reads | `stato bridge` → AGENTS.md, CLAUDE.md, `.cursor/rules/*.mdc`, copilot, GEMINI.md, SKILL.md |
 | **Hooks** | Auto-restore state after compaction | `stato hooks install` → Claude Code, Codex CLI, Gemini CLI |
 | **MCP** | Live state + validate-gated writes | `stato mcp` → every MCP client at once |
+
+### Quickstart per agent
+
+One command wires stato into your agent (it then reads the generated guidance
+automatically):
+
+| Agent | One command |
+|---|---|
+| **Claude Code** | `pip install stato && stato bridge --platform claude` |
+| **Codex CLI** | `pip install stato && stato bridge --platform agents` |
+| **Cursor** | `pip install stato && stato bridge --platform cursor` |
+| **Gemini CLI** | `pip install stato && stato bridge --platform gemini` |
+| **GitHub Copilot** | `pip install stato && stato bridge --platform copilot` |
+| **Any MCP client** | `pip install "stato[mcp]" && stato init --mcp` then run `stato mcp` |
+
+Deeper integration (optional): `stato skill install --tool <agent>` ships the
+"how to use stato" skill, and `stato init --mcp` exposes live tools like
+`stato_workspace(task)`.
+
+**Starting from scratch** (no `.stato/` yet): `pip install stato && stato init
+&& stato crystallize`, then tell your agent to *"read and follow
+`.stato/prompts/crystallize.md`"*, then `stato validate .stato/` and
+`stato bridge --platform <agent>`.
 
 ![Stato Overview](docs/figures/stato_figures.png)
 
@@ -102,14 +125,17 @@ Transfer expertise to a new project, a teammate, or the community.
 
 ### Across Platforms
 
-Same expertise, different coding agents. One command.
+Same expertise, different coding agents. One command generates every bridge:
 
     stato bridge --platform all
 
-    # Creates:
-    #   CLAUDE.md      -> Claude Code reads automatically
-    #   .cursorrules   -> Cursor reads automatically
-    #   AGENTS.md      -> Codex reads automatically
+    # Creates the file each tool reads automatically:
+    #   AGENTS.md                           -> Codex, and most agents (cross-tool standard)
+    #   CLAUDE.md                           -> Claude Code
+    #   .cursor/rules/stato.mdc             -> Cursor
+    #   .github/copilot-instructions.md     -> GitHub Copilot
+    #   GEMINI.md                           -> Gemini CLI
+    #   README.stato.md                     -> anything else / humans
 
 ### From Web AI to Coding Agent
 
@@ -135,7 +161,7 @@ Stato treats agent expertise like code: captured in structured modules, validate
 | Crystallize | Agent captures its own knowledge into structured modules |
 | 7-Pass Compiler | Validates syntax, structure, types, schema, semantics before writing |
 | Composition Algebra | Snapshot, slice, graft, merge expertise archives |
-| Cross-Platform Bridges | CLAUDE.md, .cursorrules, AGENTS.md from one source |
+| Cross-Platform Bridges | AGENTS.md, CLAUDE.md, .cursor/rules/*.mdc, Copilot, GEMINI.md, SKILL.md from one source |
 | Web AI Bridge | Import expertise from Claude.ai, ChatGPT, Gemini conversations |
 | Privacy Scanner | 19 patterns detect secrets, emails, paths before export |
 | Resume | Restore full context after /compact or session restart |

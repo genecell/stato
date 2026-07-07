@@ -52,11 +52,15 @@ class SkillName:
     confidence = 0.8                # 0-1: how sure you are this holds
     lessons_learned = \"\"\"
     - What worked and why
-    - What didn't work and why
+    - Dead-ends / pitfalls: what you TRIED that FAILED and why — record as
+      "avoid X because Y". Failures are undervalued; capture them explicitly.
+      (Run `stato reflect` to surface values you changed and reverted — those
+      are dead-ends worth writing down.)
     - Edge cases and gotchas
     - Parameter values refined through experimentation
     \"\"\"
-    # Optional: structured lessons for programmatic querying
+    # Optional: structured lessons for programmatic querying (pitfalls too:
+    # {"condition": "when tempted to X", "recommendation": "don't — causes Y"})
     lessons = [
         {"condition": "when this applies", "recommendation": "what to do",
          "confidence": 0.9, "review_by": "YYYY-MM-DD"},
