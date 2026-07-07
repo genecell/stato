@@ -5,7 +5,7 @@
 Capture, validate, and transfer AI agent expertise.
 
 [![PyPI](https://img.shields.io/pypi/v/stato)](https://pypi.org/project/stato/)
-[![Tests](https://img.shields.io/badge/tests-323%20passing-green)]()
+[![Tests](https://img.shields.io/badge/tests-340%20passing-green)]()
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)]()
 [![License](https://img.shields.io/badge/license-MIT-green)]()
 

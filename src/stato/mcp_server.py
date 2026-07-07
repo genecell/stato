@@ -168,6 +168,23 @@ def build_server(project_dir: Path):
         return json.dumps(payload, indent=2)
 
     @mcp.tool()
+    def stato_workspace(task: str = "", budget: int = 0) -> str:
+        """Assemble the working set of skills for your current TASK.
+
+        Call this each turn with a short description of what you're doing now
+        (e.g. "debugging GRN edge weights"). Returns the task-relevant skills as
+        compact summaries plus a one-line index of the rest to pull on demand.
+        With no task it falls back to the current plan step. This is the live,
+        task-conditioned way to load only what you need.
+        """
+        from stato.core.workspace import assemble_workspace
+
+        view = assemble_workspace(
+            stato_dir, task=task or None, budget=budget or None,
+        )
+        return view.render()
+
+    @mcp.tool()
     def stato_get_skill_section(skill: str, lesson_id: int) -> str:
         """Pull one lesson's full text from a skill by index (progressive
         disclosure). Read stato://skills/{skill}/summary first for the index."""

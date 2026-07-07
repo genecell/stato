@@ -133,3 +133,13 @@ def test_granular_tools_registered(project):
 
     server = build_server(project)
     assert server is not None
+
+
+def test_workspace_tool_via_core(project):
+    """The stato_workspace tool wraps assemble_workspace."""
+    from stato.core.workspace import assemble_workspace
+
+    view = assemble_workspace(project / ".stato", task="quality control filtering")
+    assert view.signal == "task"
+    text = view.render()
+    assert "Workspace for:" in text

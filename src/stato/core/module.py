@@ -75,6 +75,7 @@ SKILL_SCHEMA = {
         "lessons": list,          # structured: [{condition, recommendation, confidence, review_by}]
         "confidence": float,      # 0.0-1.0 overall trust in this skill
         "used_in_steps": list,    # plan step ids this skill serves
+        "always_load": bool,      # pin into the workspace regardless of task
         "tags": list,
         "context_requires": list,
         **PROVENANCE_FIELDS,
@@ -126,6 +127,7 @@ CONTEXT_SCHEMA = {
         "completed_tasks": list,
         "team": list,
         "notes": str,
+        "pinned_skills": list,    # skill names always loaded into the workspace
         **PROVENANCE_FIELDS,
     },
 }

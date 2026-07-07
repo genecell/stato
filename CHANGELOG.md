@@ -2,6 +2,27 @@
 
 All notable changes to Stato are documented here.
 
+## [0.10.0] - 2026-07-07
+
+Workspace — load only what the current task needs. 340 tests pass.
+
+### Added
+- **`stato workspace [TASK]`** and the MCP tool **`stato_workspace(task)`**:
+  assemble a small, task-relevant working set of skills (projected to compact
+  summaries) plus a one-line index of the rest to pull on demand. Inspired by
+  the "global workspace" in LLMs — a small, capacity-limited, task-selected set
+  broadcast to many uses.
+  - **Live task query is the primary signal** (ranked via the lexical scorer);
+    with no task it falls back to the **current plan step** (its `skills_used`,
+    else its action + objective), then to index-only.
+  - **Pins** ("directed modulation") are declared in the modules, not a sidecar:
+    a skill `always_load = True`, or `context.pinned_skills = [...]`, always
+    enter the working set. `--budget` / `--max-items` cap the rest (pins kept).
+  - Stateless — recomputed each call.
+- `team assemble` subagent bodies and `SKILL.md` now direct agents to call
+  `stato_workspace(task)` — embedding the workspace in Claude Code (and subagent)
+  workflows.
+
 ## [0.9.0] - 2026-07-03
 
 Progressive disclosure — subagents that scale. 323 tests pass.

@@ -12,8 +12,8 @@ console = Console()
 
 
 COMMAND_SECTIONS = [
-    ("State", ["init", "validate", "audit", "status", "resume", "crystallize",
-               "find", "config", "doctor", "migrate-lessons"]),
+    ("State", ["init", "validate", "audit", "status", "resume", "workspace",
+               "crystallize", "find", "config", "doctor", "migrate-lessons"]),
     ("Composition", ["snapshot", "import", "import-bundle", "inspect", "slice",
                      "graft", "diff", "merge", "convert"]),
     ("Bridges & Hooks", ["bridge", "hooks", "mcp", "crystallize-transcript"]),
@@ -1660,6 +1660,55 @@ def crystallize(print_prompt, web, path):
                 title="[bold]Crystallize[/bold]",
                 border_style="cyan",
             ))
+
+
+# ---------------------------------------------------------------------------
+# Workspace — task-conditioned working set of skills
+# ---------------------------------------------------------------------------
+
+@main.command("workspace")
+@click.argument("task", required=False)
+@click.option("--budget", type=int, default=None, help="Approx token budget for active skills")
+@click.option("--max-items", type=int, default=6, help="Max active (non-pinned) skills")
+@click.option("--json", "as_json", is_flag=True, help="Machine-readable JSON output")
+@click.option("--path", default=".", type=click.Path(), help="Project directory")
+def workspace_cmd(task, budget, max_items, as_json, path):
+    """Assemble the working set of skills for the current TASK.
+
+    Live task query is the primary signal; with no TASK it falls back to the
+    current plan step, then to index-only. Active skills are projected to
+    compact summaries; everything else is a pull-on-demand index.
+
+    Usage:
+      stato workspace "debugging GRN edge weights"
+      stato workspace                 # cold: derive from the current plan step
+      stato workspace "qc" --json
+    """
+    from stato.core.workspace import assemble_workspace
+
+    project_dir = Path(path).resolve()
+    stato_dir = project_dir / ".stato"
+    if not stato_dir.exists():
+        console.print("[red]No .stato/ directory found. Run 'stato init' first.[/red]")
+        raise SystemExit(1)
+
+    view = assemble_workspace(stato_dir, task=task, budget=budget, max_items=max_items)
+    if as_json:
+        _echo_json(view.to_dict())
+        return
+
+    signal_note = {"task": f"task: {task}", "plan": "from current plan step",
+                   "none": "no task/plan signal"}[view.signal]
+    console.print(f"[bold]Workspace[/bold] [dim]({signal_note})[/dim]")
+    if view.active:
+        console.print("\n[bold]Active skills:[/bold]")
+        for item in view.active:
+            console.print(f"  [green]{item.name}[/green] [dim]({item.reason})[/dim]")
+    else:
+        console.print("\n[dim]No active skills selected.[/dim]")
+    if view.index:
+        console.print(f"\n[dim]Available to pull on demand: "
+                      f"{', '.join(e['name'] for e in view.index)}[/dim]")
 
 
 # ---------------------------------------------------------------------------

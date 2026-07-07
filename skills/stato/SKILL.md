@@ -4,7 +4,7 @@ description: Use stato to persist, validate, and restore an AI agent's cognitive
 license: MIT
 metadata:
   author: Stato
-  version: "0.9.0"
+  version: "0.10.0"
 ---
 
 # Using stato
@@ -67,6 +67,11 @@ Declare a type explicitly with `__stato_type__ = "skill"` if inference is unsure
 - `stato team assemble` — generate expertise-scoped subagents from `.stato/team.toml`.
 
 ## Deeper integration (optional, better UX)
+- **Workspace**: call `stato_workspace(task)` (MCP) or `stato workspace "<task>"`
+  each time you start a task to load only the relevant skills (compact
+  summaries) instead of reading the whole library; pull a specific lesson with
+  `stato_get_skill_section`. Live task query is the primary signal; with no task
+  it falls back to the current plan step.
 - **MCP**: `stato mcp` exposes state as resources and validate-gated write tools
   (`stato_write_module`, `stato_update_plan_step`, `stato_append_lesson`); an
   agent gets diagnostics back in the tool result and self-corrects in one turn.

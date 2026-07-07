@@ -199,7 +199,8 @@ def _agent_body(team: TeamSpec, agent: AgentSpec, skills: list[dict],
             summary = summarize_module(s["full_path"].read_text()) if s.get("full_path") else None
             if summary is not None:
                 lines += [render_summary(summary), ""]
-        lines += ["Pull a lesson's full text on demand via the stato MCP tool "
+        lines += ["Load the skills relevant to your current task with the stato "
+                  "MCP tool `stato_workspace(task)`; pull a specific lesson with "
                   "`stato_get_skill_section(skill, id)`, or read that section of "
                   "`.stato/skills/<name>.py`. Don't load whole skills up front."]
     if agent.handoff:

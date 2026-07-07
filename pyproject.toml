@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "stato"
-version = "0.9.0"
+version = "0.10.0"
 description = "Capture, validate, and transfer AI agent expertise."
 readme = "README.md"
 license = {text = "MIT"}
