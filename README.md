@@ -177,8 +177,6 @@ Stato treats agent expertise like code: captured in structured modules, validate
 
 ## CLI Reference
 
-| Command | Description |
-|---|---|
 **State**
 
 | Command | Description |
