@@ -805,3 +805,78 @@ The same spec-valid SKILL.md works across tools — only the target directory
 differs. It teaches the operating loop, module schemas, key commands, and the
 MCP/hooks integration. (This is distinct from `stato bridge --platform skill`,
 which exports *a project's* captured expertise as a skill.)
+
+---
+
+## Quality, workspace, and reflection (v0.7–v0.11)
+
+### Audit — score module quality (`stato audit`)
+
+```bash
+stato audit .stato/                 # per-module 0–10 score + concrete gaps
+stato audit .stato/skills/qc.py     # a single module
+stato audit .stato/ --min 7         # exit 1 if any module scores below 7 (CI / pre-publish gate)
+stato audit .stato/ --json
+```
+
+Checks for docstrings, provenance (`source`/`updated_at`), documented params,
+`version`/`confidence`, `run()` type hints, stale `review_by` dates, plan
+`decision_log`, completed-step outputs, and more.
+
+### Workspace — load only what the task needs (`stato workspace`)
+
+```bash
+stato workspace "debugging GRN edge weights"   # skills relevant to this task
+stato workspace                                # cold: derive from the current plan step
+stato workspace "qc" --budget 2000 --json
+```
+
+Live task query is the primary signal; with no task it falls back to the current
+plan step, then to index-only. Active skills are projected to compact summaries;
+the rest is a pull-on-demand index. Pins (`always_load = True` on a skill, or
+`context.pinned_skills`) always stay in the set. Also available as the MCP tool
+`stato_workspace(task)` — the recommended way to use it inside Claude Code.
+
+### Reflect — record the failures you'd forget (`stato reflect`)
+
+```bash
+stato reflect                       # candidate lessons from .stato/.history/
+stato reflect --min-churn 4 --json
+```
+
+Reads your edit history and flags **reversions** (a value that changed and came
+back — e.g. `max_pct_mito: 20 → 25 → 20`, a dead-end) and churn. Stato surfaces
+the evidence; you decide what to record as a lesson (via `append_lesson` or the
+crystallize prompt). Also the MCP tool `stato_reflect()`.
+
+### Migrate prose lessons to structured (`stato migrate-lessons`)
+
+```bash
+stato migrate-lessons .stato/       # prose lessons_learned -> structured `lessons`
+stato migrate-lessons .stato/ --dry-run
+```
+
+Non-destructive (keeps the prose). Structured lessons are individually
+addressable, which enables precise progressive disclosure.
+
+### Team assembly — expertise-scoped subagents (`stato team assemble`)
+
+```bash
+stato team assemble                 # reads .stato/team.toml -> .claude/agents/*.md
+stato team assemble --format all    # claude, codex, gemini, sdk
+stato team assemble --inline        # embed full skills (default: lessons index + pull-on-demand)
+```
+
+Each role gets only its skills. Native per-tool formats: Claude/Gemini
+(`.md` + frontmatter), Codex (`.toml`, prompt in `developer_instructions`),
+Agent SDK (`.json`).
+
+### Environment check (`stato doctor`)
+
+```bash
+stato doctor                        # resolved binary, version, .stato/ presence, hooks, MCP
+stato doctor --json
+```
+
+Useful when `stato` runs from a conda/venv `bin/` that isn't on the default PATH
+— it shows exactly which stato is answering.

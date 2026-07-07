@@ -112,7 +112,7 @@ Transfer expertise to a new project, a teammate, or the community.
     stato import scrna-expert.stato
 
     # Or install from the community registry
-    stato registry install genecell/scrna-expert
+    stato registry install piaso-scrna-skills-testing
 
 **Composition algebra** for working with expertise archives:
 
@@ -162,6 +162,12 @@ Stato treats agent expertise like code: captured in structured modules, validate
 | 7-Pass Compiler | Validates syntax, structure, types, schema, semantics before writing |
 | Composition Algebra | Snapshot, slice, graft, merge expertise archives |
 | Cross-Platform Bridges | AGENTS.md, CLAUDE.md, .cursor/rules/*.mdc, Copilot, GEMINI.md, SKILL.md from one source |
+| Workspace | Assemble only the skills relevant to the current task (progressive disclosure) |
+| Audit | Score module quality 0–10 with concrete gaps; gate publishing |
+| Reflect | Surface dead-ends (reverted values) from edit history as candidate lessons |
+| Team Assembly | Generate expertise-scoped subagents from a team spec |
+| MCP Server | Expose live state + validate-gated write tools to any MCP client |
+| Hooks | Auto-restore state after compaction (Claude Code, Codex, Gemini) |
 | Web AI Bridge | Import expertise from Claude.ai, ChatGPT, Gemini conversations |
 | Privacy Scanner | 19 patterns detect secrets, emails, paths before export |
 | Resume | Restore full context after /compact or session restart |
@@ -173,49 +179,82 @@ Stato treats agent expertise like code: captured in structured modules, validate
 
 | Command | Description |
 |---|---|
-| `stato init` | Initialize a stato project |
-| `stato crystallize` | Save prompt for agent to capture expertise |
-| `stato crystallize --print` | Print full crystallize prompt to terminal |
-| `stato crystallize --web` | Generate prompt optimized for web AI |
-| `stato validate` | Run 7-pass compiler on modules |
+**State**
+
+| Command | Description |
+|---|---|
+| `stato init` | Initialize a stato project (`--mcp` also writes `.mcp.json`) |
+| `stato validate` | Run 7-pass compiler on modules (`--strict`, `--error-code`) |
+| `stato audit` | Score module quality 0–10 with gaps (`--min` to gate) |
 | `stato status` | Show all modules, plan progress, warnings |
-| `stato bridge` | Generate platform bridge files |
 | `stato resume` | Generate context recap for session restoration |
-| `stato diff` | Compare module versions |
-| `stato snapshot` | Export expertise as portable archive |
-| `stato import` | Import modules from .stato archive |
-| `stato import-bundle` | Import from web AI bundle file |
-| `stato inspect` | Preview archive contents |
+| `stato workspace [TASK]` | Assemble the skills relevant to the current task |
+| `stato reflect` | Surface reverted/churned values from history as candidate lessons |
+| `stato crystallize` | Save the capture prompt (`--print`, `--web`) |
+| `stato find` | Search local skills by name, tags, and lessons |
+| `stato config` | Show effective config and its sources (`--init`) |
+| `stato doctor` | Report binary path, version, project state, hooks, MCP |
+| `stato migrate-lessons` | Convert prose lessons into structured entries |
+
+**Composition & sharing**
+
+| Command | Description |
+|---|---|
+| `stato snapshot` | Export expertise as a checksummed portable archive |
+| `stato import` | Import modules from a .stato archive (verified) |
+| `stato import-bundle` | Import from a web AI bundle file |
+| `stato inspect` | Preview archive contents + integrity |
 | `stato slice` | Extract specific modules with dependencies |
 | `stato graft` | Add external module with validation |
 | `stato merge` | Combine two archives with conflict resolution |
-| `stato convert` | Migrate from CLAUDE.md, .cursorrules, SKILL.md |
-| `stato registry list` | List available packages |
-| `stato registry search` | Search packages by keyword |
-| `stato registry install` | Install a community package |
+| `stato diff` | Compare module versions / archives |
+| `stato convert` | Migrate from CLAUDE.md, .cursorrules, SKILL.md, etc. |
+| `stato registry search/install/list/package` | Search, install, and package community expertise |
+
+**Bridges, hooks, MCP, teams, skill**
+
+| Command | Description |
+|---|---|
+| `stato bridge --platform <agent>` | Generate the instruction file each tool reads |
+| `stato hooks install` | Auto-restore state after compaction (`--reminders`) |
+| `stato mcp` | Run the MCP server (resources + validate-gated tools) |
+| `stato team assemble` | Generate expertise-scoped subagents from `.stato/team.toml` |
+| `stato skill install` | Install the "how to use stato" Agent Skill into a tool |
 
 Full documentation: [stato.hiniki.com](https://stato.hiniki.com/getting-started/installation/) | [USAGE.md](USAGE.md)
 
 ## Comparison
 
-| Capability | Stato | Plain CLAUDE.md | SkillKit | MemGPT | CrewAI |
-|---|---|---|---|---|---|
-| Validated modules | 7-pass compiler | No validation | No validation | No | No |
-| Cross-platform | 4 platforms | Claude only | Claude only | OpenAI only | Framework-locked |
-| Composition algebra | snapshot, slice, graft, merge | Manual copy | No | No | No |
-| Privacy scanning | 19 patterns | None | None | None | None |
-| Web AI bridge | Import from any chat | No | No | No | No |
-| Agent self-capture | Crystallize prompt | Human-authored | Human-authored | Auto (opaque) | Config files |
-| Package registry | GitHub-based | No | No | No | No |
-| Session resume | Structured recap | Re-read file | No | Built-in | No |
+Against the neighbouring categories — static instruction files, agent-memory
+services, and skills marketplaces. Stato's lane is a **validated, portable,
+tool-agnostic memory + evaluation layer**; where another category genuinely does
+something, the table says so.
+
+| Capability | Stato | Instruction files (CLAUDE.md / AGENTS.md / .cursor rules) | Agent memory (Mem0 / Letta) | Skills marketplaces (Agent Skills) |
+|---|---|---|---|---|
+| Validated before it persists | 7-pass compiler | none | none | none |
+| Imported expertise can't execute code | AST-only, no `exec` | n/a (text) | n/a | skills may run code |
+| One source → many tools | 6 bridges + MCP + hooks | one format per tool | SDK/service-tied | portable skill files |
+| Portable, checksummed archives | `.stato` + sha256 | manual copy | service-hosted | folder copy |
+| Task-scoped context (not the whole dump) | workspace + summaries | static, whole file | retrieval | static |
+| Recovers state after compaction | hooks (Claude/Codex/Gemini) | no | varies | no |
+| Live, validate-gated writes | MCP tools | no | writes (unvalidated) | no |
+| Learns from failures (edit history) | `stato reflect` | no | no | no |
+| Composition algebra | snapshot/slice/graft/merge | manual copy | no | no |
+| Privacy scan before sharing | 19 patterns | none | none | none |
+| Agent self-capture | crystallize | human-authored | auto (opaque) | human-authored |
+| Human-readable & git-native | typed Python modules | markdown | opaque store | markdown |
+
+Stato composes with these rather than replacing them — it *generates* the
+instruction files, exposes an MCP server, and can export Agent Skills.
 
 ## Registry
 
 Browse and install shared expertise packages:
 
     stato registry list
-    stato registry search "bioinformatics"
-    stato registry install scrna-expert
+    stato registry search "scrna"
+    stato registry install piaso-scrna-skills-testing
 
 ## Contributing
 
